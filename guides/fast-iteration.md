@@ -1,21 +1,14 @@
 # Fast Iteration
 
-Choose this preset when latency matters and you want Astra to orchestrate
-quickly with Luna subagents.
+Keep the configured Sol `high` root and Luna `max` subagents. For a faster
+feedback loop, reduce unnecessary work rather than silently replacing the
+requested models or reasoning levels.
 
-Start with the [Pro profile](full-orchestration.md). This optional root
-preset keeps Astra `medium`; the installed Luna roles remain at `max` and
-the Astra reviewer at `low`. For a Luna root, use the [Plus profile](plus-plan.md).
+Use narrow tasks, targeted test commands and concise subagent reports. Keep
+small edits root-only; for larger tasks parallelize only independent exploration
+or implementation with non-overlapping file ownership. The two-child profile
+can limit concurrency, but is not guaranteed to minimize wall time or total usage.
 
-Add or merge this into:
-
-`~/.codex/config.toml`
-
-```toml
-model = "gpt-6-astra"
-model_reasoning_effort = "medium"
-service_tier = "fast"
-```
-
-If your Codex version does not support `service_tier`, remove that line and
-keep the model and reasoning settings.
+This fork does not enable a paid Fast/service tier automatically. Check the
+current client capabilities and any pricing implications before changing such
+settings. Compare measurements using [token-usage.md](token-usage.md).

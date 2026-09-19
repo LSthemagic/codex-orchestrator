@@ -1,22 +1,19 @@
 # Complex Repository Work
 
-Choose this preset for architecture changes, difficult debugging, and work
-where higher-confidence reasoning matters more than latency.
+The standard [Sol/Luna profile](full-orchestration.md) already uses Sol at
+`high` reasoning. No model override is needed for cross-component debugging,
+architecture-sensitive fixes or multi-file features.
 
-This is an optional root override for the [Pro profile](full-orchestration.md),
-whose default is Astra `medium`. It leaves the installed Luna `max` roles
-and Astra `low` reviewer in place. If you adopt this override, update the
-installed skill's root-reasoning wording to match.
+Ask the root to map dependencies and establish acceptance criteria first.
+Delegate independent exploration to Luna, then assign implementation with
+explicit file ownership. Keep dependent changes sequential. Use a fresh Luna
+reviewer context for correctness, security and regression risks; Sol integrates
+findings and owns final verification.
 
-Add or merge this into:
+Start with the existing four-child ceiling or select the two-child profile.
+Do not add agents merely because a slot is available. Avoid simultaneous
+writers to shared schemas, API contracts or configuration files. Report
+architectural blockers to the root instead of automatically changing models.
 
-`~/.codex/config.toml`
-
-```toml
-model = "gpt-6-astra"
-model_reasoning_effort = "high"
-service_tier = "standard"
-```
-
-If your Codex version does not support `service_tier`, remove that line and
-keep the model and reasoning settings.
+Measure actual results with [token-usage.md](token-usage.md). More concurrency
+or reasoning is not a guarantee of higher quality, lower cost or faster delivery.

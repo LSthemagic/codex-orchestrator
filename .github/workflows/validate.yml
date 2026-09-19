@@ -1,0 +1,28 @@
+name: Validate orchestration profiles
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Check POSIX syntax
+        if: runner.os == 'Linux'
+        run: sh -n setup.sh
+      - name: Test profiles and installers
+        run: python -m unittest discover -s tests -v

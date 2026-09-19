@@ -6,15 +6,10 @@ script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 
 cat <<'BANNER'
 +---------------------------------------+
-|    _    ____ _____ ____      _        |
-|   / \  / ___|_   _|  _ \    / \       |
-|  / _ \ \___ \ | | | |_) |  / _ \      |
-| / ___ \ ___) || | |  _ <  / ___ \     |
-|/_/   \_\____/ |_| |_| \_\/_/   \_\    |
-|                                       |
-|       O R C H E S T R A T O R         |
-|   Plan and orchestrate with Astra.    |
-|          Execute with Luna.           |
+|          CODEX ORCHESTRATOR           |
+|       Plan with Sol High.             |
+|       Execute with Luna Max.          |
+|       Review with Luna Max.           |
 +---------------------------------------+
 BANNER
 printf '%s\n' 'Interactive project setup'
@@ -29,6 +24,13 @@ fi
 target_dir=$(CDPATH= cd -- "$target_path" && pwd -P)
 if [ "$target_dir" = "$script_dir" ]; then
     printf 'Error: target repository must be different from the setup source directory.\n' >&2
+    exit 1
+fi
+
+# Do not combine old and new orchestration policies in an existing installation.
+legacy_skill=$target_dir/.agents/skills/astra-orchestrator
+if [ -e "$legacy_skill" ] || [ -L "$legacy_skill" ] || { [ -f "$target_dir/AGENTS.md" ] && grep -q 'astra-orchestrator' "$target_dir/AGENTS.md"; }; then
+    printf 'Error: legacy orchestration found. Follow guides/migration.md before installing; no files changed.\n' >&2
     exit 1
 fi
 
@@ -120,10 +122,10 @@ merge_conflicts() {
 select_plan() {
     printf '%s\n' 'Choose Profile to install'
     # Keep the original profiles first for existing numeric selections.
-    printf '%s\n' '  1) Pro  - GPT-6 Astra (medium) orchestrates, GPT-5.6 Luna (max) executes, GPT-6 Astra (low) reviews'
-    printf '%s\n' '  2) Plus - GPT-5.6 Luna (max) orchestrates, GPT-5.6 Luna (medium) executes, GPT-6 Astra (low) reviews'
-    printf '%s\n' '  3) Pro (max 2 subagents) - GPT-6 Astra (medium) orchestrates, GPT-5.6 Luna (max) executes, GPT-6 Astra (low) reviews'
-    printf '%s\n' '  4) Plus (max 2 subagents) - GPT-5.6 Luna (max) orchestrates, GPT-5.6 Luna (medium) executes, GPT-6 Astra (low) reviews'
+    printf '%s\n' '  1) Pro (4 subagents) - GPT-5.6 Sol (high) orchestrates; GPT-5.6 Luna (max) executes and reviews'
+    printf '%s\n' '  2) Plus (compatibility alias, 4 subagents) - GPT-5.6 Sol (high) orchestrates; GPT-5.6 Luna (max) executes and reviews'
+    printf '%s\n' '  3) Pro (max 2 subagents) - GPT-5.6 Sol (high) orchestrates; GPT-5.6 Luna (max) executes and reviews'
+    printf '%s\n' '  4) Plus (compatibility alias, max 2 subagents) - GPT-5.6 Sol (high) orchestrates; GPT-5.6 Luna (max) executes and reviews'
 
     while :; do
         printf '%s' 'Select plan [1-4] (default 1): '
@@ -186,7 +188,10 @@ copy_component() {
                 printf '%s\n' "$conflict_list" | sed 's/^/  /' >&2
                 return 0
             fi
-        elif [ ! -L "$destination_path" ] && { [ -d "$source_path" ] && [ ! -d "$destination_path" ] || [ -f "$source_path" ] && [ ! -f "$destination_path" ]; }; then
+        elif [ ! -L "$destination_path" ] && {
+            { [ -d "$source_path" ] && [ ! -d "$destination_path" ]; } ||
+            { [ -f "$source_path" ] && [ ! -f "$destination_path" ]; };
+        }; then
             printf 'Skipped %s: source and target types are incompatible.\n' "$name" >&2
             return 0
         fi
@@ -240,4 +245,4 @@ for component in .codex .agents AGENTS.md; do
 done
 
 printf '\nSetup complete. %s component(s) installed in %s (plan: %s).\n' "$installed" "$target_dir" "$plan"
-printf '%s\n' 'See guides/ for optional Codex model and Fast-mode configurations.'
+printf '%s\n' 'Restart Codex in the trusted target project and invoke $sol-orchestrator. See guides/ for validation and migration.'

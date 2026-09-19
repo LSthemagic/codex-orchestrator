@@ -7,15 +7,10 @@ $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $PSCommandPath
 $banner = @'
 +---------------------------------------+
-|    _    ____ _____ ____      _        |
-|   / \  / ___|_   _|  _ \    / \       |
-|  / _ \ \___ \ | | | |_) |  / _ \      |
-| / ___ \ ___) || | |  _ <  / ___ \     |
-|/_/   \_\____/ |_| |_| \_\/_/   \_\    |
-|                                       |
-|       O R C H E S T R A T O R         |
-|   Plan and orchestrate with Astra.    |
-|          Execute with Luna.           |
+|          CODEX ORCHESTRATOR           |
+|       Plan with Sol High.             |
+|       Execute with Luna Max.          |
+|       Review with Luna Max.           |
 +---------------------------------------+
 '@
 
@@ -52,10 +47,10 @@ function Read-Confirmation {
 
 function Read-Plan {
     [Console]::WriteLine('Choose Profile to install')
-    [Console]::WriteLine('  1) Pro  - GPT-6 Astra (medium) orchestrates, GPT-5.6 Luna (max) executes, GPT-6 Astra (low) reviews')
-    [Console]::WriteLine('  2) Plus - GPT-5.6 Luna (max) orchestrates, GPT-5.6 Luna (medium) executes, GPT-6 Astra (low) reviews')
-    [Console]::WriteLine('  3) Pro (max 2 subagents) - GPT-6 Astra (medium) orchestrates, GPT-5.6 Luna (max) executes, GPT-6 Astra (low) reviews')
-    [Console]::WriteLine('  4) Plus (max 2 subagents) - GPT-5.6 Luna (max) orchestrates, GPT-5.6 Luna (medium) executes, GPT-6 Astra (low) reviews')
+    [Console]::WriteLine('  1) Pro (4 subagents) - GPT-5.6 Sol (high) orchestrates; GPT-5.6 Luna (max) executes and reviews')
+    [Console]::WriteLine('  2) Plus (compatibility alias, 4 subagents) - GPT-5.6 Sol (high) orchestrates; GPT-5.6 Luna (max) executes and reviews')
+    [Console]::WriteLine('  3) Pro (max 2 subagents) - GPT-5.6 Sol (high) orchestrates; GPT-5.6 Luna (max) executes and reviews')
+    [Console]::WriteLine('  4) Plus (compatibility alias, max 2 subagents) - GPT-5.6 Sol (high) orchestrates; GPT-5.6 Luna (max) executes and reviews')
 
     while ($true) {
         [Console]::Write('Select plan [1-4] (default 1): ')
@@ -323,6 +318,15 @@ try {
         throw 'Target repository must be different from the setup source directory.'
     }
 
+    # Reject legacy policies before making any changes to the target.
+    $legacySkill = Join-Path $targetDirectory '.agents/skills/astra-orchestrator'
+    $targetInstructions = Join-Path $targetDirectory 'AGENTS.md'
+    $hasLegacyInstructions = (Test-Path -LiteralPath $targetInstructions -PathType Leaf) -and
+        ([IO.File]::ReadAllText($targetInstructions).Contains('astra-orchestrator'))
+    if ((Test-Path -LiteralPath $legacySkill) -or $hasLegacyInstructions) {
+        throw 'Legacy orchestration found. Follow guides/migration.md before installing; no files changed.'
+    }
+
     $plan = Read-Plan
     $profileDirectory = Join-Path $scriptDir "profiles/$plan"
 
@@ -349,7 +353,7 @@ try {
 
     [Console]::WriteLine()
     [Console]::WriteLine("Setup complete. $installed component(s) installed in $targetDirectory (plan: $plan).")
-    [Console]::WriteLine('See guides/ for optional Codex model and Fast-mode configurations.')
+    [Console]::WriteLine('Restart Codex in the trusted target project and invoke $sol-orchestrator. See guides/ for validation and migration.')
 }
 catch {
     [Console]::Error.WriteLine("Setup cancelled: $($_.Exception.Message)")

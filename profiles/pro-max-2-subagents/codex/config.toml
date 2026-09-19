@@ -1,33 +1,18 @@
-# Codex: Astra orchestrator + Luna subagents
-#
-# Main knobs to change:
-#   model / model_reasoning_effort
-#   agents.default_subagent_model
-#   agents.default_subagent_reasoning_effort
-#   agents.max_concurrent_threads_per_session
-#
-# This is intentionally project-scoped. Put it at:
-#   <repo>/.codex/config.toml
-#
-# For a personal/global setup, merge the same settings into:
-#   ~/.codex/config.toml
+# Codex: Sol High orchestrator + Luna Max subagents.
+# Adapted from donvito/codex-astra-luna-orchestrator by LSthemagic.
+# Install at <project>/.codex/config.toml, or merge into ~/.codex/config.toml.
+# Named roles in agents/*.toml are explicitly pinned to Luna Max as well.
+# Profile names pro/plus are compatibility aliases, not subscription checks.
 
-# Root / orchestrator
-model = "gpt-6-astra"
-model_reasoning_effort = "medium"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
 
-# Safe interactive defaults. Change if your workflow needs otherwise.
 approval_policy = "on-request"
 sandbox_mode = "workspace-write"
 
 [agents]
 enabled = true
-
-# Number of child agent threads Codex may keep open concurrently.
-# Start with 4-6. Increase only when the work is genuinely parallel.
+# Concurrent child threads only; the root does not count toward this limit.
 max_concurrent_threads_per_session = 2
-
-# Default for any spawned subagent that does not explicitly choose a model.
-# Plan defaults: Pro uses max Luna reasoning; Plus uses medium Luna reasoning.
 default_subagent_model = "gpt-5.6-luna"
 default_subagent_reasoning_effort = "max"

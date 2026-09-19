@@ -1,22 +1,14 @@
 # Routine Coding
 
-Choose this preset for predictable, routine coding tasks where lower cost and
-faster orchestration are preferred.
+For a small, localized change, let the Sol `high` root work directly. The
+`sol-orchestrator` skill is intended for complex or explicitly delegated work,
+not a requirement to spawn every role for every edit.
 
-This is an optional root override for the [Plus profile](plus-plan.md),
-lowering its Luna root from `max` to `medium`. The installed Luna subagents
-remain at `medium` and the Astra reviewer at `low`. If you adopt this override,
-update the installed skill's root-reasoning wording to match.
+Retain the installed model configuration. Ask for the smallest defensible
+change, a targeted regression test and a check of the final diff. Do not
+introduce architectural changes, automatic commits or unrelated refactors.
 
-Add or merge this into:
-
-`~/.codex/config.toml`
-
-```toml
-model = "gpt-5.6-luna"
-model_reasoning_effort = "medium"
-service_tier = "fast"
-```
-
-If your Codex version does not support `service_tier`, remove that line and
-keep the model and reasoning settings.
+When independent validation materially helps, delegate a bounded test or review
+to Luna `max`. Keep a review context separate from an implementation context.
+For strictly sequential work, avoid overlapping agents even if the configured
+concurrent-child ceiling is greater than one.
