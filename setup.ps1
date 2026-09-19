@@ -425,7 +425,7 @@ try {
     if ((Test-Path -LiteralPath $legacySkill) -or $hasLegacyInstructions) { throw 'Legacy orchestration found. Follow guides/migration.md before installing; no files changed.' }
     $installed = 0
     foreach ($component in '.codex', '.agents', 'AGENTS.md') {
-        if (Read-Confirmation -Prompt "Install $component?" -DefaultYes $true) {
+        if (Read-Confirmation -Prompt ("Install {0}?" -f $component) -DefaultYes $true) {
             $result = if ($component -eq '.codex') { Install-Component -Name $component -TargetDirectory $targetDirectory -SourcePath (Join-Path $profileDirectory "codex") }
             elseif ($component -eq '.agents') { Install-Component -Name $component -TargetDirectory $targetDirectory -SourcePath (Join-Path $profileDirectory "agents") }
             else { Install-Component -Name $component -TargetDirectory $targetDirectory }
