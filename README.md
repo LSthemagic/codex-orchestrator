@@ -1,6 +1,6 @@
 # Codex Orchestrator: Sol High + Luna Max
 
-A project-scoped Codex setup with **GPT-5.6 Sol at high reasoning** as the
+A global-or-project Codex setup with **GPT-5.6 Sol at high reasoning** as the
 root/orchestrator and **GPT-5.6 Luna at max reasoning** for every subagent,
 including the reviewer. No active profile selects Astra.
 
@@ -48,7 +48,7 @@ The installer copies configuration; it does not provision model access or
 validate an authenticated model call. Do not silently substitute another model
 or reasoning effort when your client rejects a setting.
 
-## Install into a project
+## Install globally or into a project
 
 Clone this fork into a separate directory:
 
@@ -74,8 +74,20 @@ PowerShell 7 alternative: `pwsh -File .\setup.ps1`.
 sh ./setup.sh
 ```
 
-Enter the target project path, select **1** for four concurrent children or
-**3** for two, and approve each component you want to install. Installation adds:
+The installer now asks for scope first. Choose **1 (Global)** to apply the setup to every Codex project for your user, or **2 (Project)** for one repository. Global is the default. Then select profile **1** for four concurrent children or **3** for two.
+
+Global installation writes/merges:
+
+```text
+~/.codex/config.toml
+~/.codex/agents/{explorer,worker,researcher,tester,reviewer}.toml
+~/.codex/AGENTS.md
+~/.agents/skills/sol-orchestrator/SKILL.md
+```
+
+If `CODEX_HOME` is set, the config, named agents and global `AGENTS.md` use that directory. Skills remain under `$HOME/.agents/skills`, matching Codex user-scope skill discovery. Existing global `config.toml` is merged for only the Sol/Luna keys and backed up as `config.toml.bak`; unrelated settings such as MCP servers are preserved. An existing global `AGENTS.md` is appended idempotently. If `AGENTS.override.md` exists in `CODEX_HOME`, the installer warns because Codex prefers that file over global `AGENTS.md`.
+
+Project installation adds:
 
 ```text
 <target>/
@@ -98,7 +110,7 @@ Existing `AGENTS.md` content is preserved and the new instructions are appended
 only once. A detected legacy `astra-orchestrator` skill or reference in the
 target's `AGENTS.md` blocks installation before any writes. Follow the
 [migration guide](guides/migration.md) rather than loading both policies.
-The installer never changes your global Codex configuration.
+Project mode never changes your global Codex configuration. Global mode changes only the user-level Codex configuration and skill locations described above, with a backup before merging an existing config.
 
 ## Configuration
 
@@ -122,11 +134,7 @@ All five named role files explicitly set `model = "gpt-5.6-luna"` and
 `model_reasoning_effort = "max"`. Changing only the default subagent settings
 does not change these explicit role overrides.
 
-For personal/global installation, merge the root settings into
-`~/.codex/config.toml`, copy the role files into `~/.codex/agents/`, and copy
-`sol-orchestrator` into `~/.agents/skills/`. Preserve existing settings and check
-for project-level overrides. Do not copy the whole project installer into your
-home directory or overwrite an existing global config blindly.
+For personal/global installation, choose **Global** in `setup.ps1` or `setup.sh`. The installer performs the user-level merge and copies the named roles, skill, and global instructions. Project-level `.codex/config.toml` and `AGENTS.md` files can still override global defaults.
 
 ## Start and verify
 
