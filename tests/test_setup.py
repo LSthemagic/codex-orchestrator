@@ -25,13 +25,56 @@ class InstallerCases:
         target = target or self.target
         result = subprocess.run(
             self.command,
-            input="\n".join([str(target), *answers]) + "\n",
+            input="\n".join(["2", *answers[:1], str(target), *answers[1:]]) + "\n",
             text=True, capture_output=True, cwd=ROOT, timeout=40,
         )
         return result
 
     def assert_success(self, result):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def run_global(self, answers, existing_config=None):
+        home = Path(self.temp.name) / "home"
+        codex_home = home / ".codex"
+        codex_home.mkdir(parents=True)
+        if existing_config is not None:
+            (codex_home / "config.toml").write_text(existing_config, encoding="utf-8")
+        env = os.environ.copy()
+        env["HOME"] = str(home)
+        env["USERPROFILE"] = str(home)
+        env["CODEX_HOME"] = str(codex_home)
+        result = subprocess.run(
+            self.command,
+            input="\n".join(["1", *answers]) + "\n",
+            text=True, capture_output=True, cwd=ROOT, timeout=40, env=env,
+        )
+        return result, home, codex_home
+
+    def test_global_fresh_install_is_default_scope(self):
+        result, home, codex_home = self.run_global(["1", ""])
+        self.assert_success(result)
+        config = tomllib.loads((codex_home / "config.toml").read_text(encoding="utf-8"))
+        self.assertEqual(config["model"], "gpt-5.6-sol")
+        self.assertEqual(config["model_reasoning_effort"], "high")
+        self.assertEqual(config["agents"]["default_subagent_model"], "gpt-5.6-luna")
+        self.assertEqual(config["agents"]["default_subagent_reasoning_effort"], "max")
+        self.assertTrue((codex_home / "agents/reviewer.toml").is_file())
+        self.assertTrue((home / ".agents/skills/sol-orchestrator/SKILL.md").is_file())
+        self.assertTrue((codex_home / "AGENTS.md").is_file())
+
+    def test_global_merge_preserves_unrelated_config_and_creates_backup(self):
+        original = 'model = "old"\ncustom_setting = "keep"\n[mcp_servers.demo]\ncommand = "demo"\n'
+        result, home, codex_home = self.run_global(["3", ""], original)
+        self.assert_success(result)
+        merged_text = (codex_home / "config.toml").read_text(encoding="utf-8")
+        merged = tomllib.loads(merged_text)
+        self.assertEqual(merged["model"], "gpt-5.6-sol")
+        self.assertEqual(merged["model_reasoning_effort"], "high")
+        self.assertEqual(merged["custom_setting"], "keep")
+        self.assertEqual(merged["mcp_servers"]["demo"]["command"], "demo")
+        self.assertEqual(merged["agents"]["max_concurrent_threads_per_session"], 2)
+        self.assertEqual((codex_home / "config.toml.bak").read_text(encoding="utf-8"), original)
+
 
     def test_fresh_install_all_profiles(self):
         cases = [("", "pro", 4), ("1", "pro", 4), ("2", "plus", 4),
