@@ -278,7 +278,46 @@ function Install-Component {
                 return $false
             }
             $reader = [IO.StreamReader]::new($destinationPath, [Text.Encoding]::UTF8, $true)
-            function Merge-GlobalConfig {
+            try {
+                $null = $reader.ReadToEnd()
+                $encoding = $reader.CurrentEncoding
+            }
+            finally {
+                $reader.Dispose()
+            }
+            [IO.File]::AppendAllText($destinationPath, "`n`n" + $instructions, $encoding)
+            [Console]::WriteLine("Appended instructions to ${Name}. Existing contents preserved.")
+            return $true
+        }
+
+        Show-OverwriteWarning -Source $sourceItem -Destination $destinationPath -Name $Name
+
+        if (-not (Read-Confirmation -Prompt "Update ${Name}? New files will be added; only paths listed above will be replaced." -DefaultYes $false)) {
+            [Console]::WriteLine("Skipped $Name (existing target left unchanged).")
+            return $false
+        }
+
+        if ($sourceItem.PSIsContainer -and $destinationItem.PSIsContainer) {
+            Copy-DirectoryContents -Source $sourcePath -Destination $destinationPath
+        }
+        elseif ((-not $sourceItem.PSIsContainer) -and (-not $destinationItem.PSIsContainer)) {
+            Copy-Item -LiteralPath $sourcePath -Destination $destinationPath -Force
+        }
+        else {
+            [Console]::Error.WriteLine("Skipped ${Name}: source and target types are incompatible.")
+            return $false
+        }
+
+        [Console]::WriteLine("Updated $Name.")
+        return $true
+    }
+
+    Copy-Item -LiteralPath $sourcePath -Destination $destinationPath -Recurse -Force
+    [Console]::WriteLine("Installed $Name.")
+    return $true
+}
+
+function Merge-GlobalConfig {
     param([Parameter(Mandatory)][string]$SourceConfig, [Parameter(Mandatory)][string]$DestinationConfig)
     $source = [IO.File]::ReadAllText($SourceConfig)
     if (-not (Test-Path -LiteralPath $DestinationConfig -PathType Leaf)) {
@@ -308,13 +347,10 @@ function Install-Component {
     $agentsFound = $false
     foreach ($line in $lines) {
         if ($line -match '^\s*\[([^]]+)\]\s*(?:#.*)?$') {
-            if ($section -eq 'agents') {
-                foreach ($key in $agentValues.Keys) { if (-not $agentsSeen.ContainsKey($key)) { $output.Add($agentValues[$key]) } }
-            }
+            if ($section -eq 'agents') { foreach ($key in $agentValues.Keys) { if (-not $agentsSeen.ContainsKey($key)) { $output.Add($agentValues[$key]) } } }
             $section = $Matches[1]
             if ($section -eq 'agents') { $agentsFound = $true }
-            $output.Add($line)
-            continue
+            $output.Add($line); continue
         }
         if ($section -eq '' -and $line -match '^\s*([A-Za-z0-9_-]+)\s*=') {
             $key = $Matches[1]
@@ -328,16 +364,11 @@ function Install-Component {
     }
     $firstTable = $output.FindIndex([Predicate[string]]{ param($line) $line -match '^\s*\[' })
     if ($firstTable -lt 0) { $firstTable = $output.Count }
-    foreach ($key in @($rootValues.Keys)) {
-        if (-not $rootSeen.ContainsKey($key)) { $output.Insert($firstTable, $rootValues[$key]); $firstTable++ }
-    }
+    foreach ($key in @($rootValues.Keys)) { if (-not $rootSeen.ContainsKey($key)) { $output.Insert($firstTable, $rootValues[$key]); $firstTable++ } }
     if ($agentsFound) {
-        if ($section -eq 'agents') {
-            foreach ($key in $agentValues.Keys) { if (-not $agentsSeen.ContainsKey($key)) { $output.Add($agentValues[$key]) } }
-        }
+        if ($section -eq 'agents') { foreach ($key in $agentValues.Keys) { if (-not $agentsSeen.ContainsKey($key)) { $output.Add($agentValues[$key]) } } }
     } else {
-        $output.Add('')
-        $output.Add('[agents]')
+        $output.Add(''); $output.Add('[agents]')
         foreach ($key in $agentValues.Keys) { $output.Add($agentValues[$key]) }
     }
     $merged = ($output -join [Environment]::NewLine).TrimEnd() + [Environment]::NewLine
@@ -349,13 +380,13 @@ function Install-Global {
     param([Parameter(Mandatory)][string]$ProfileDirectory)
     $codexHome = if ([string]::IsNullOrWhiteSpace($env:CODEX_HOME)) { Join-Path $HOME '.codex' } else { $env:CODEX_HOME }
     $agentsHome = Join-Path $HOME '.agents'
-    New-Item -ItemType Directory -Path $codexHome -Force | Out-Null
-    New-Item -ItemType Directory -Path (Join-Path $codexHome 'agents') -Force | Out-Null
-    New-Item -ItemType Directory -Path (Join-Path $agentsHome 'skills') -Force | Out-Null
     $legacySkill = Join-Path $agentsHome 'skills/astra-orchestrator'
     $globalInstructions = Join-Path $codexHome 'AGENTS.md'
     $hasLegacyInstructions = (Test-Path -LiteralPath $globalInstructions -PathType Leaf) -and ([IO.File]::ReadAllText($globalInstructions).Contains('astra-orchestrator'))
     if ((Test-Path -LiteralPath $legacySkill) -or $hasLegacyInstructions) { throw 'Legacy global orchestration found. Follow guides/migration.md before installing; no files changed.' }
+    New-Item -ItemType Directory -Path $codexHome -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $codexHome 'agents') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $agentsHome 'skills') -Force | Out-Null
     Merge-GlobalConfig -SourceConfig (Join-Path $ProfileDirectory 'codex/config.toml') -DestinationConfig (Join-Path $codexHome 'config.toml')
     Copy-DirectoryContents -Source (Join-Path $ProfileDirectory 'codex/agents') -Destination (Join-Path $codexHome 'agents')
     Copy-DirectoryContents -Source (Join-Path $ProfileDirectory 'agents/skills') -Destination (Join-Path $agentsHome 'skills')
