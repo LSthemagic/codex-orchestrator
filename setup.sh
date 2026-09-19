@@ -12,27 +12,7 @@ cat <<'BANNER'
 |       Review with Luna Max.           |
 +---------------------------------------+
 BANNER
-printf '%s\n' 'Interactive project setup'
-printf '%s' 'Target repository path: '
-IFS= read -r target_path || exit 1
-
-if [ -z "$target_path" ] || [ ! -d "$target_path" ]; then
-    printf 'Error: target must be an existing directory: %s\n' "${target_path:-<empty>}" >&2
-    exit 1
-fi
-
-target_dir=$(CDPATH= cd -- "$target_path" && pwd -P)
-if [ "$target_dir" = "$script_dir" ]; then
-    printf 'Error: target repository must be different from the setup source directory.\n' >&2
-    exit 1
-fi
-
-# Do not combine old and new orchestration policies in an existing installation.
-legacy_skill=$target_dir/.agents/skills/astra-orchestrator
-if [ -e "$legacy_skill" ] || [ -L "$legacy_skill" ] || { [ -f "$target_dir/AGENTS.md" ] && grep -q 'astra-orchestrator' "$target_dir/AGENTS.md"; }; then
-    printf 'Error: legacy orchestration found. Follow guides/migration.md before installing; no files changed.\n' >&2
-    exit 1
-fi
+printf '%s\n' 'Interactive setup'
 
 confirm() {
     prompt=$1
@@ -116,6 +96,21 @@ merge_conflicts() {
         if { [ -e "$destination_directory" ] || [ -L "$destination_directory" ]; } && [ ! -d "$destination_directory" ]; then
             printf '%s\n' "$relative_path"
         fi
+    done
+}
+
+select_scope() {
+    printf '%s\n' 'Installation scope'
+    printf '%s\n' '  1) Global (recommended) - applies to every Codex project for this user'
+    printf '%s\n' '  2) Project - installs only into one repository'
+    while :; do
+        printf '%s' 'Select scope [1-2] (default 1): '
+        IFS= read -r answer || { printf '\nSetup cancelled: input ended before setup was complete.\n' >&2; exit 1; }
+        case "$answer" in
+            1|global|GLOBAL|Global|'') scope=global; return ;;
+            2|project|PROJECT|Project) scope=project; return ;;
+            *) printf '%s\n' 'Please enter 1 (global) or 2 (project).' ;;
+        esac
     done
 }
 
@@ -223,8 +218,118 @@ copy_component() {
     component_installed=yes
 }
 
+merge_global_config() {
+    source_config=$1
+    destination_config=$2
+    if [ ! -f "$destination_config" ]; then
+        cp "$source_config" "$destination_config"
+        return
+    fi
+    cp "$destination_config" "$destination_config.bak"
+    limit=4
+    grep -Eq 'max_concurrent_threads_per_session[[:space:]]*=[[:space:]]*2' "$source_config" && limit=2
+    tmp_file=$destination_config.tmp.$
+    awk -v limit="$limit" '
+        BEGIN { section=""; agents_found=0; a_enabled=0; a_limit=0; a_model=0; a_effort=0 }
+        function emit_missing_agents() {
+            if (!a_enabled) print "enabled = true"
+            if (!a_limit) print "max_concurrent_threads_per_session = " limit
+            if (!a_model) print "default_subagent_model = \"gpt-5.6-luna\""
+            if (!a_effort) print "default_subagent_reasoning_effort = \"max\""
+        }
+        /^\[[^]]+\][[:space:]]*(#.*)?$/ {
+            if (section=="agents") emit_missing_agents()
+            section=$0; sub(/^\[/,"",section); sub(/\].*$/,"",section)
+            if (section=="agents") agents_found=1
+            print; next
+        }
+        section=="" && /^[[:space:]]*model[[:space:]]*=/ { print "model = \"gpt-5.6-sol\""; next }
+        section=="" && /^[[:space:]]*model_reasoning_effort[[:space:]]*=/ { print "model_reasoning_effort = \"high\""; next }
+        section=="" && /^[[:space:]]*approval_policy[[:space:]]*=/ { print "approval_policy = \"on-request\""; next }
+        section=="" && /^[[:space:]]*sandbox_mode[[:space:]]*=/ { print "sandbox_mode = \"workspace-write\""; next }
+        section=="agents" && /^[[:space:]]*enabled[[:space:]]*=/ { print "enabled = true"; a_enabled=1; next }
+        section=="agents" && /^[[:space:]]*max_concurrent_threads_per_session[[:space:]]*=/ { print "max_concurrent_threads_per_session = " limit; a_limit=1; next }
+        section=="agents" && /^[[:space:]]*default_subagent_model[[:space:]]*=/ { print "default_subagent_model = \"gpt-5.6-luna\""; a_model=1; next }
+        section=="agents" && /^[[:space:]]*default_subagent_reasoning_effort[[:space:]]*=/ { print "default_subagent_reasoning_effort = \"max\""; a_effort=1; next }
+        { print }
+        END {
+            if (section=="agents") emit_missing_agents()
+            if (!agents_found) {
+                print ""; print "[agents]"; print "enabled = true"; print "max_concurrent_threads_per_session = " limit
+                print "default_subagent_model = \"gpt-5.6-luna\""; print "default_subagent_reasoning_effort = \"max\""
+            }
+        }
+    ' "$destination_config" > "$tmp_file"
+    prefix=$destination_config.prefix.$
+    : > "$prefix"
+    grep -Eq '^[[:space:]]*model[[:space:]]*=' "$destination_config" || printf '%s\n' 'model = "gpt-5.6-sol"' >> "$prefix"
+    grep -Eq '^[[:space:]]*model_reasoning_effort[[:space:]]*=' "$destination_config" || printf '%s\n' 'model_reasoning_effort = "high"' >> "$prefix"
+    grep -Eq '^[[:space:]]*approval_policy[[:space:]]*=' "$destination_config" || printf '%s\n' 'approval_policy = "on-request"' >> "$prefix"
+    grep -Eq '^[[:space:]]*sandbox_mode[[:space:]]*=' "$destination_config" || printf '%s\n' 'sandbox_mode = "workspace-write"' >> "$prefix"
+    cat "$prefix" "$tmp_file" > "$destination_config"
+    rm -f "$prefix" "$tmp_file"
+    printf 'Merged global config. Backup: %s\n' "$destination_config.bak"
+}
+
+install_global() {
+    profile_dir=$1
+    codex_home=$HOME/.codex
+    if [ -n "$CODEX_HOME" ]; then codex_home=$CODEX_HOME; fi
+    agents_home=$HOME/.agents
+    legacy_skill=$agents_home/skills/astra-orchestrator
+    if [ -e "$legacy_skill" ] || [ -L "$legacy_skill" ] || { [ -f "$codex_home/AGENTS.md" ] && grep -q 'astra-orchestrator' "$codex_home/AGENTS.md"; }; then
+        printf '%s\n' 'Error: legacy global orchestration found. Follow guides/migration.md before installing; no files changed.' >&2
+        exit 1
+    fi
+    mkdir -p "$codex_home/agents" "$agents_home/skills"
+    merge_global_config "$profile_dir/codex/config.toml" "$codex_home/config.toml"
+    cp -R "$profile_dir/codex/agents"/. "$codex_home/agents"/
+    cp -R "$profile_dir/agents/skills"/. "$agents_home/skills"/
+    if [ -f "$codex_home/AGENTS.md" ]; then
+        if ! grep -q 'sol-orchestrator' "$codex_home/AGENTS.md"; then
+            printf '\n\n' >> "$codex_home/AGENTS.md"
+            cat "$script_dir/AGENTS.md" >> "$codex_home/AGENTS.md"
+        fi
+    else
+        cp "$script_dir/AGENTS.md" "$codex_home/AGENTS.md"
+    fi
+    if [ -f "$codex_home/AGENTS.override.md" ]; then
+        printf '%s\n' 'WARNING: AGENTS.override.md exists in CODEX_HOME, so Codex will prefer it over the installed global AGENTS.md.'
+    fi
+    printf 'Global setup complete in %s and %s.\n' "$codex_home" "$agents_home"
+    printf '%s\n' 'Restart Codex and invoke $sol-orchestrator. Project-level config can still override global settings.'
+}
+
+scope=global
+select_scope
 plan=pro
 select_plan
+
+if [ "$scope" = global ]; then
+    if confirm 'Install Sol High + Luna Max globally for this user?' yes; then
+        install_global "$script_dir/profiles/$plan"
+    else
+        printf '%s\n' 'Global installation skipped.'
+    fi
+    exit 0
+fi
+
+printf '%s' 'Target repository path: '
+IFS= read -r target_path || exit 1
+if [ -z "$target_path" ] || [ ! -d "$target_path" ]; then
+    printf 'Error: target must be an existing directory: %s\n' "$target_path" >&2
+    exit 1
+fi
+target_dir=$(CDPATH= cd -- "$target_path" && pwd -P)
+if [ "$target_dir" = "$script_dir" ]; then
+    printf '%s\n' 'Error: target repository must be different from the setup source directory.' >&2
+    exit 1
+fi
+legacy_skill=$target_dir/.agents/skills/astra-orchestrator
+if [ -e "$legacy_skill" ] || [ -L "$legacy_skill" ] || { [ -f "$target_dir/AGENTS.md" ] && grep -q 'astra-orchestrator' "$target_dir/AGENTS.md"; }; then
+    printf '%s\n' 'Error: legacy orchestration found. Follow guides/migration.md before installing; no files changed.' >&2
+    exit 1
+fi
 
 installed=0
 for component in .codex .agents AGENTS.md; do
