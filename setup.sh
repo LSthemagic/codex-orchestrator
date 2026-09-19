@@ -274,7 +274,7 @@ merge_global_config() {
 install_global() {
     profile_dir=$1
     codex_home=$HOME/.codex
-    if [ -n "$CODEX_HOME" ]; then codex_home=$CODEX_HOME; fi
+    if [ -n "${CODEX_HOME:-}" ]; then codex_home=$CODEX_HOME; fi
     agents_home=$HOME/.agents
     legacy_skill=$agents_home/skills/astra-orchestrator
     if [ -e "$legacy_skill" ] || [ -L "$legacy_skill" ] || { [ -f "$codex_home/AGENTS.md" ] && grep -q 'astra-orchestrator' "$codex_home/AGENTS.md"; }; then
