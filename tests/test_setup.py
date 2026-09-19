@@ -25,7 +25,7 @@ class InstallerCases:
         target = target or self.target
         result = subprocess.run(
             self.command,
-            input="\n".join(["2", *answers[:1], str(target), *answers[1:]]) + "\n",
+            input="\n".join(["2", answers[0] if answers else "1", str(target), *answers[1:]]) + "\n",
             text=True, capture_output=True, cwd=ROOT, timeout=40,
         )
         return result
