@@ -1,19 +1,17 @@
 # Compatibility Profiles: Plus and Pro
 
-This fork keeps the original installer names and numeric choices to avoid
-breaking existing installation instructions. They no longer select different
-model families or reasoning efforts based on a subscription label.
+Original profile names and numeric choices are retained to avoid breaking
+installation instructions. They do not infer subscriptions or choose models
+from a plan label.
 
-`plus` and `pro` both use **Sol high** for the root and **Luna max** for every
-subagent, including reviewer, with a four-child ceiling.
-`plus-max-2-subagents` and `pro-max-2-subagents` use the same settings with a
-two-child ceiling. The files in each alias pair are identical.
+`plus` and `pro` share the complete [GPT-6 role matrix](../README.md#model-matrix)
+and a four-child ceiling. `plus-max-2-subagents` and `pro-max-2-subagents` use
+the same matrix with a two-child ceiling. Alias pairs are byte-identical.
 
-Choose option 1 for the default or option 3 to limit concurrency. The installer
-also accepts all four profile directory names. It does not check your plan,
-provision model access, estimate quota, or promise a cheaper run on Plus.
+Choose option 1 by default or option 3 to limit concurrency. The installer
+also accepts the four profile directory names. It does not provision model
+access, estimate quota or promise cheaper execution for any subscription.
 
-A previous upstream Plus installation had different model and effort choices.
-Update the root config, all five role files, the skill and its `AGENTS.md`
-reference together; see [migration](migration.md). Measure your own usage with
-[token-usage.md](token-usage.md).
+Update the root config, all nine role files (including the compatible `worker`),
+skill and managed instructions together. See [migration](migration.md).
+Measure your environment with [token usage](token-usage.md).

@@ -1,11 +1,12 @@
 name = "tester"
 description = "Verification subagent. Use to run targeted tests, reproduce failures, add missing tests when requested, and report exact evidence."
 
-model = "gpt-5.6-luna"
-model_reasoning_effort = "max"
+model = "gpt-6-luna"
+model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 
 developer_instructions = """
+Do not spawn subagents. Report decisions and blockers to the parent orchestrator.
 You are the test and verification subagent.
 
 Verify the delegated behavior independently.
@@ -26,3 +27,6 @@ Return:
 4. Coverage gaps
 5. Suggested next action
 """
+
+[agents]
+enabled = false

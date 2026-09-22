@@ -1,10 +1,11 @@
-# Codex: Sol High orchestrator + Luna Max subagents.
+# Codex GPT-6: Sol High orchestrator + task-specific model/effort routing.
 # Adapted from donvito/codex-astra-luna-orchestrator by LSthemagic.
 # Install at <project>/.codex/config.toml, or merge into ~/.codex/config.toml.
-# Named roles in agents/*.toml are explicitly pinned to Luna Max as well.
+# Named roles in agents/*.toml override the Luna Max fallback below.
+# Astra is available only as the exceptional, read-only escalation role.
 # Profile names pro/plus are compatibility aliases, not subscription checks.
 
-model = "gpt-5.6-sol"
+model = "gpt-6-sol"
 model_reasoning_effort = "high"
 
 approval_policy = "on-request"
@@ -14,5 +15,5 @@ sandbox_mode = "workspace-write"
 enabled = true
 # Concurrent child threads only; the root does not count toward this limit.
 max_concurrent_threads_per_session = 4
-default_subagent_model = "gpt-5.6-luna"
+default_subagent_model = "gpt-6-luna"
 default_subagent_reasoning_effort = "max"

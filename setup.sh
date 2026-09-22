@@ -9,7 +9,7 @@ cat <<'BANNER'
 |          CODEX ORCHESTRATOR           |
 |       Plan with Sol High.             |
 |       Execute with Luna Max.          |
-|       Review with Luna Max.           |
+|       Review with Sol High.           |
 +---------------------------------------+
 BANNER
 printf '%s\n' 'Interactive setup'
@@ -117,10 +117,10 @@ select_scope() {
 select_plan() {
     printf '%s\n' 'Choose Profile to install'
     # Keep the original profiles first for existing numeric selections.
-    printf '%s\n' '  1) Pro (4 subagents) - GPT-5.6 Sol (high) orchestrates; GPT-5.6 Luna (max) executes and reviews'
-    printf '%s\n' '  2) Plus (compatibility alias, 4 subagents) - GPT-5.6 Sol (high) orchestrates; GPT-5.6 Luna (max) executes and reviews'
-    printf '%s\n' '  3) Pro (max 2 subagents) - GPT-5.6 Sol (high) orchestrates; GPT-5.6 Luna (max) executes and reviews'
-    printf '%s\n' '  4) Plus (compatibility alias, max 2 subagents) - GPT-5.6 Sol (high) orchestrates; GPT-5.6 Luna (max) executes and reviews'
+    printf '%s\n' '  1) Pro (4 subagents) - GPT-6 Sol (high) orchestrates; GPT-6 Luna (max) implements; Sol (high) reviews'
+    printf '%s\n' '  2) Plus (compatibility alias, 4 subagents) - GPT-6 Sol (high) orchestrates; GPT-6 Luna (max) implements; Sol (high) reviews'
+    printf '%s\n' '  3) Pro (max 2 subagents) - GPT-6 Sol (high) orchestrates; GPT-6 Luna (max) implements; Sol (high) reviews'
+    printf '%s\n' '  4) Plus (compatibility alias, max 2 subagents) - GPT-6 Sol (high) orchestrates; GPT-6 Luna (max) implements; Sol (high) reviews'
 
     while :; do
         printf '%s' 'Select plan [1-4] (default 1): '
@@ -137,6 +137,49 @@ select_plan() {
             *) printf '%s\n' 'Please enter a listed plan number or name.' ;;
         esac
     done
+}
+
+render_instructions() {
+    awk -v replacement_path="$script_dir/AGENTS.md" \
+        -v legacy_path="$script_dir/scripts/legacy-sol-AGENTS.md" \
+        -f "$script_dir/scripts/merge-instructions.awk" "$1"
+}
+
+check_instructions() {
+    for instructions_check_path in "$1" "$1.bak"; do
+        if [ -L "$instructions_check_path" ] || { [ -e "$instructions_check_path" ] && [ ! -f "$instructions_check_path" ]; }; then
+            printf 'Error: instructions and backup must be regular files: %s\n' "$instructions_check_path" >&2
+            return 1
+        fi
+    done
+    if [ -f "$1" ]; then render_instructions "$1" > /dev/null; fi
+}
+
+install_instructions() {
+    instructions_destination=$1
+    instructions_changed=no
+    check_instructions "$instructions_destination" || return 1
+    if [ ! -f "$instructions_destination" ]; then
+        cp "$script_dir/AGENTS.md" "$instructions_destination"
+        instructions_changed=yes
+        printf 'Installed instructions: %s\n' "$instructions_destination"
+        return
+    fi
+    instructions_tmp=$(mktemp "${TMPDIR:-/tmp}/codex-instructions.XXXXXX") || return 1
+    if ! render_instructions "$instructions_destination" > "$instructions_tmp"; then
+        rm -f "$instructions_tmp"
+        return 1
+    fi
+    if cmp -s "$instructions_tmp" "$instructions_destination"; then
+        rm -f "$instructions_tmp"
+        printf 'Skipped instructions: already current in %s.\n' "$instructions_destination"
+        return
+    fi
+    cp "$instructions_destination" "$instructions_destination.bak"
+    cat "$instructions_tmp" > "$instructions_destination"
+    rm -f "$instructions_tmp"
+    instructions_changed=yes
+    printf 'Updated managed instructions; other rules preserved. Backup: %s.bak\n' "$instructions_destination"
 }
 
 copy_component() {
@@ -156,18 +199,8 @@ copy_component() {
                 printf 'Skipped %s: target must be a regular file, not a symbolic link.\n' "$name" >&2
                 return 0
             fi
-            instructions=$(cat "$source_path")
-            existing_instructions=$(cat "$destination_path")
-            case "$existing_instructions" in
-                *"$instructions"*)
-                    printf 'Skipped %s: instructions already present.\n' "$name"
-                    return 0
-                    ;;
-            esac
-            printf '\n\n' >> "$destination_path"
-            cat "$source_path" >> "$destination_path"
-            printf 'Appended instructions to %s. Existing contents preserved.\n' "$name"
-            component_installed=yes
+            install_instructions "$destination_path" || return 1
+            component_installed=$instructions_changed
             return 0
         fi
         if [ ! -L "$destination_path" ] && [ -d "$source_path" ] && [ -d "$destination_path" ]; then
@@ -228,46 +261,54 @@ merge_global_config() {
     cp "$destination_config" "$destination_config.bak"
     limit=4
     grep -Eq 'max_concurrent_threads_per_session[[:space:]]*=[[:space:]]*2' "$source_config" && limit=2
-    tmp_file=$destination_config.tmp.$
-    awk -v limit="$limit" '
-        BEGIN { section=""; agents_found=0; a_enabled=0; a_limit=0; a_model=0; a_effort=0 }
-        function emit_missing_agents() {
+    tmp_file=$(mktemp "${TMPDIR:-/tmp}/codex-config.XXXXXX") || return 1
+    if ! awk -v limit="$limit" '
+        BEGIN { section="" }
+        function emit_root() {
+            if (root_done) return
+            if (!r_model) print "model = \"gpt-6-sol\""
+            if (!r_effort) print "model_reasoning_effort = \"high\""
+            if (!r_approval) print "approval_policy = \"on-request\""
+            if (!r_sandbox) print "sandbox_mode = \"workspace-write\""
+            root_done=1
+        }
+        function emit_agents() {
             if (!a_enabled) print "enabled = true"
             if (!a_limit) print "max_concurrent_threads_per_session = " limit
-            if (!a_model) print "default_subagent_model = \"gpt-5.6-luna\""
+            if (!a_model) print "default_subagent_model = \"gpt-6-luna\""
             if (!a_effort) print "default_subagent_reasoning_effort = \"max\""
         }
-        /^\[[^]]+\][[:space:]]*(#.*)?$/ {
-            if (section=="agents") emit_missing_agents()
-            section=$0; sub(/^\[/,"",section); sub(/\].*$/,"",section)
+        /^[[:space:]]*\[/ {
+            emit_root()
+            if (section=="agents") emit_agents()
+            section=$0; sub(/^[[:space:]]*\[/,"",section); sub(/\].*$/,"",section)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", section)
             if (section=="agents") agents_found=1
             print; next
         }
-        section=="" && /^[[:space:]]*model[[:space:]]*=/ { print "model = \"gpt-5.6-sol\""; next }
-        section=="" && /^[[:space:]]*model_reasoning_effort[[:space:]]*=/ { print "model_reasoning_effort = \"high\""; next }
-        section=="" && /^[[:space:]]*approval_policy[[:space:]]*=/ { print "approval_policy = \"on-request\""; next }
-        section=="" && /^[[:space:]]*sandbox_mode[[:space:]]*=/ { print "sandbox_mode = \"workspace-write\""; next }
+        section=="" && /^[[:space:]]*model[[:space:]]*=/ { print "model = \"gpt-6-sol\""; r_model=1; next }
+        section=="" && /^[[:space:]]*model_reasoning_effort[[:space:]]*=/ { print "model_reasoning_effort = \"high\""; r_effort=1; next }
+        section=="" && /^[[:space:]]*approval_policy[[:space:]]*=/ { print "approval_policy = \"on-request\""; r_approval=1; next }
+        section=="" && /^[[:space:]]*sandbox_mode[[:space:]]*=/ { print "sandbox_mode = \"workspace-write\""; r_sandbox=1; next }
         section=="agents" && /^[[:space:]]*enabled[[:space:]]*=/ { print "enabled = true"; a_enabled=1; next }
+        section=="agents" && /^[[:space:]]*max_threads[[:space:]]*=/ { next }
         section=="agents" && /^[[:space:]]*max_concurrent_threads_per_session[[:space:]]*=/ { print "max_concurrent_threads_per_session = " limit; a_limit=1; next }
-        section=="agents" && /^[[:space:]]*default_subagent_model[[:space:]]*=/ { print "default_subagent_model = \"gpt-5.6-luna\""; a_model=1; next }
+        section=="agents" && /^[[:space:]]*default_subagent_model[[:space:]]*=/ { print "default_subagent_model = \"gpt-6-luna\""; a_model=1; next }
         section=="agents" && /^[[:space:]]*default_subagent_reasoning_effort[[:space:]]*=/ { print "default_subagent_reasoning_effort = \"max\""; a_effort=1; next }
         { print }
         END {
-            if (section=="agents") emit_missing_agents()
+            emit_root()
+            if (section=="agents") emit_agents()
             if (!agents_found) {
-                print ""; print "[agents]"; print "enabled = true"; print "max_concurrent_threads_per_session = " limit
-                print "default_subagent_model = \"gpt-5.6-luna\""; print "default_subagent_reasoning_effort = \"max\""
+                print ""; print "[agents]"; emit_agents()
             }
         }
-    ' "$destination_config" > "$tmp_file"
-    prefix=$destination_config.prefix.$
-    : > "$prefix"
-    grep -Eq '^[[:space:]]*model[[:space:]]*=' "$destination_config" || printf '%s\n' 'model = "gpt-5.6-sol"' >> "$prefix"
-    grep -Eq '^[[:space:]]*model_reasoning_effort[[:space:]]*=' "$destination_config" || printf '%s\n' 'model_reasoning_effort = "high"' >> "$prefix"
-    grep -Eq '^[[:space:]]*approval_policy[[:space:]]*=' "$destination_config" || printf '%s\n' 'approval_policy = "on-request"' >> "$prefix"
-    grep -Eq '^[[:space:]]*sandbox_mode[[:space:]]*=' "$destination_config" || printf '%s\n' 'sandbox_mode = "workspace-write"' >> "$prefix"
-    cat "$prefix" "$tmp_file" > "$destination_config"
-    rm -f "$prefix" "$tmp_file"
+    ' "$destination_config" > "$tmp_file"; then
+        rm -f "$tmp_file"
+        return 1
+    fi
+    cat "$tmp_file" > "$destination_config"
+    rm -f "$tmp_file"
     printf 'Merged global config. Backup: %s\n' "$destination_config.bak"
 }
 
@@ -281,18 +322,12 @@ install_global() {
         printf '%s\n' 'Error: legacy global orchestration found. Follow guides/migration.md before installing; no files changed.' >&2
         exit 1
     fi
+    check_instructions "$codex_home/AGENTS.md" || return 1
     mkdir -p "$codex_home/agents" "$agents_home/skills"
     merge_global_config "$profile_dir/codex/config.toml" "$codex_home/config.toml"
     cp -R "$profile_dir/codex/agents"/. "$codex_home/agents"/
     cp -R "$profile_dir/agents/skills"/. "$agents_home/skills"/
-    if [ -f "$codex_home/AGENTS.md" ]; then
-        if ! grep -q 'sol-orchestrator' "$codex_home/AGENTS.md"; then
-            printf '\n\n' >> "$codex_home/AGENTS.md"
-            cat "$script_dir/AGENTS.md" >> "$codex_home/AGENTS.md"
-        fi
-    else
-        cp "$script_dir/AGENTS.md" "$codex_home/AGENTS.md"
-    fi
+    install_instructions "$codex_home/AGENTS.md" || return 1
     if [ -f "$codex_home/AGENTS.override.md" ]; then
         printf '%s\n' 'WARNING: AGENTS.override.md exists in CODEX_HOME, so Codex will prefer it over the installed global AGENTS.md.'
     fi
@@ -306,7 +341,7 @@ plan=pro
 select_plan
 
 if [ "$scope" = global ]; then
-    if confirm 'Install Sol High + Luna Max globally for this user?' yes; then
+    if confirm 'Install GPT-6 role routing globally for this user?' yes; then
         install_global "$script_dir/profiles/$plan"
     else
         printf '%s\n' 'Global installation skipped.'
@@ -330,6 +365,8 @@ if [ -e "$legacy_skill" ] || [ -L "$legacy_skill" ] || { [ -f "$target_dir/AGENT
     printf '%s\n' 'Error: legacy orchestration found. Follow guides/migration.md before installing; no files changed.' >&2
     exit 1
 fi
+
+check_instructions "$target_dir/AGENTS.md" || exit 1
 
 installed=0
 for component in .codex .agents AGENTS.md; do

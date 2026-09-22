@@ -12,6 +12,9 @@ POWERSHELL = shutil.which("powershell") or shutil.which("pwsh")
 SH = shutil.which("sh") if os.name != "nt" else None
 
 
+LEGACY_RULES = '# Codex project instructions\n\nFor complex coding tasks, use the `sol-orchestrator` skill when its trigger conditions match.\n\nThe root runs on GPT-5.6 Sol with high reasoning and owns architecture, decomposition,\nintegration and final verification. All named subagents, including reviewer, use\nGPT-5.6 Luna with max reasoning. Start the reviewer in a separate context from the worker.\n\nPrefer bounded exploration, implementation, testing, review and technical research.\nDo not delegate trivial work merely for parallelism. Respect the configured concurrent\nchild-thread limit and do not let implementation agents edit overlapping files.\nDo not commit or push unless explicitly authorized by the user.\nUser instructions always take precedence over this orchestration policy.\n'
+
+
 class InstallerCases:
     command = []
 
@@ -36,7 +39,7 @@ class InstallerCases:
     def run_global(self, answers, existing_config=None):
         home = Path(self.temp.name) / "home"
         codex_home = home / ".codex"
-        codex_home.mkdir(parents=True)
+        codex_home.mkdir(parents=True, exist_ok=True)
         if existing_config is not None:
             (codex_home / "config.toml").write_text(existing_config, encoding="utf-8")
         env = os.environ.copy()
@@ -54,9 +57,9 @@ class InstallerCases:
         result, home, codex_home = self.run_global(["1", ""])
         self.assert_success(result)
         config = tomllib.loads((codex_home / "config.toml").read_text(encoding="utf-8"))
-        self.assertEqual(config["model"], "gpt-5.6-sol")
+        self.assertEqual(config["model"], "gpt-6-sol")
         self.assertEqual(config["model_reasoning_effort"], "high")
-        self.assertEqual(config["agents"]["default_subagent_model"], "gpt-5.6-luna")
+        self.assertEqual(config["agents"]["default_subagent_model"], "gpt-6-luna")
         self.assertEqual(config["agents"]["default_subagent_reasoning_effort"], "max")
         self.assertTrue((codex_home / "agents/reviewer.toml").is_file())
         self.assertTrue((home / ".agents/skills/sol-orchestrator/SKILL.md").is_file())
@@ -68,7 +71,7 @@ class InstallerCases:
         self.assert_success(result)
         merged_text = (codex_home / "config.toml").read_text(encoding="utf-8")
         merged = tomllib.loads(merged_text)
-        self.assertEqual(merged["model"], "gpt-5.6-sol")
+        self.assertEqual(merged["model"], "gpt-6-sol")
         self.assertEqual(merged["model_reasoning_effort"], "high")
         self.assertEqual(merged["custom_setting"], "keep")
         self.assertEqual(merged["mcp_servers"]["demo"]["command"], "demo")
@@ -85,7 +88,7 @@ class InstallerCases:
                 target.mkdir()
                 result = self.run_setup([selection, "", "", ""], target)
                 self.assert_success(result)
-                self.assertIn("GPT-5.6 Sol (high)", result.stdout)
+                self.assertIn("GPT-6 Sol (high)", result.stdout)
                 self.assertNotIn("GPT-6 Astra", result.stdout)
                 for component, source in [(".codex", "codex"), (".agents", "agents")]:
                     for path in (ROOT / "profiles" / profile / source).rglob("*"):
@@ -123,7 +126,7 @@ class InstallerCases:
         result = self.run_setup(["1", "y", "y", "n", "n"])
         self.assert_success(result)
         self.assertEqual(extra.read_text(encoding="utf-8"), "keep this")
-        self.assertEqual(tomllib.loads(config.read_text(encoding="utf-8"))["model"], "gpt-5.6-sol")
+        self.assertEqual(tomllib.loads(config.read_text(encoding="utf-8"))["model"], "gpt-6-sol")
 
     def test_agents_append_is_idempotent(self):
         path = self.target / "AGENTS.md"
@@ -134,6 +137,116 @@ class InstallerCases:
         self.assertEqual(path.read_bytes(), first)
         self.assertIn(b"Preserve this rule.", first)
         self.assertEqual(first.count(b"For complex coding tasks"), 1)
+
+
+    def test_global_upgrade_replaces_old_rules_and_is_idempotent(self):
+        home = Path(self.temp.name) / "home"
+        codex_home = home / ".codex"
+        codex_home.mkdir(parents=True)
+        path = codex_home / "AGENTS.md"
+        original = "# Personal rules\nKeep my rules.\n\n" + LEGACY_RULES + "\nKeep trailing rules.\n"
+        path.write_text(original, encoding="utf-8")
+        result, _, _ = self.run_global(["1", ""])
+        self.assert_success(result)
+        actual = path.read_text(encoding="utf-8")
+        self.assertIn("Keep my rules.", actual)
+        self.assertIn("Keep trailing rules.", actual)
+        self.assertNotIn("GPT-5.6", actual)
+        self.assertEqual(actual.count("<!-- codex-orchestrator:begin -->"), 1)
+        self.assertEqual(path.with_name("AGENTS.md.bak").read_text(encoding="utf-8"), original)
+        before = path.read_bytes()
+        result, _, _ = self.run_global(["1", ""])
+        self.assert_success(result)
+        self.assertEqual(path.read_bytes(), before)
+        self.assertEqual(path.with_name("AGENTS.md.bak").read_text(encoding="utf-8"), original)
+        for role, model, effort in (
+            ("explorer", "gpt-6-luna", "medium"), ("researcher", "gpt-6-luna", "max"),
+            ("implementer", "gpt-6-luna", "max"), ("worker", "gpt-6-luna", "max"),
+            ("tester", "gpt-6-luna", "high"), ("debugger", "gpt-6-sol", "high"),
+            ("reviewer", "gpt-6-sol", "high"), ("architect", "gpt-6-sol", "xhigh"),
+            ("escalation", "gpt-6-astra", "high"),
+        ):
+            with self.subTest(role=role):
+                config = tomllib.loads((codex_home / "agents" / (role + ".toml")).read_text(encoding="utf-8"))
+                self.assertEqual((config["model"], config["model_reasoning_effort"]), (model, effort))
+                self.assertFalse(config["agents"]["enabled"])
+
+    def test_project_upgrade_replaces_old_rules_and_preserves_crlf_text(self):
+        path = self.target / "AGENTS.md"
+        original = "# Project rules\nKeep this first.\n\n" + LEGACY_RULES + "\nKeep this last.\n"
+        path.write_bytes(original.replace("\n", "\r\n").encode())
+        self.assert_success(self.run_setup(["1", "n", "n", "y"]))
+        actual = path.read_text(encoding="utf-8")
+        self.assertNotIn("GPT-5.6", actual)
+        self.assertIn("Keep this first.", actual)
+        self.assertIn("Keep this last.", actual)
+        self.assertEqual(actual.count("<!-- codex-orchestrator:begin -->"), 1)
+        self.assertEqual(path.with_name("AGENTS.md.bak").read_bytes(), original.replace("\n", "\r\n").encode())
+
+    def test_managed_block_is_replaced_without_touching_outside_rules(self):
+        path = self.target / "AGENTS.md"
+        original = ("# Custom\nKeep before.\n\n<!-- codex-orchestrator:begin -->\n"
+                    "Old managed policy.\n<!-- codex-orchestrator:end -->\n\nKeep after.\n")
+        path.write_text(original, encoding="utf-8")
+        self.assert_success(self.run_setup(["1", "n", "n", "y"]))
+        actual = path.read_text(encoding="utf-8")
+        self.assertNotIn("Old managed policy.", actual)
+        self.assertIn("Keep before.", actual)
+        self.assertIn("Keep after.", actual)
+        self.assertEqual(actual.count("<!-- codex-orchestrator:begin -->"), 1)
+
+    def test_customized_legacy_rules_require_manual_migration_before_writes(self):
+        path = self.target / "AGENTS.md"
+        original = LEGACY_RULES.replace("high reasoning", "medium reasoning")
+        path.write_text(original, encoding="utf-8")
+        result = self.run_setup(["1", "y", "y", "y"])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("guides/migration.md", result.stdout + result.stderr)
+        self.assertEqual(path.read_text(encoding="utf-8"), original)
+        self.assertFalse((self.target / ".codex").exists())
+
+    def test_invalid_managed_markers_abort_before_config_changes(self):
+        for original in (
+            "<!-- codex-orchestrator:begin -->\nUnclosed policy.\n",
+            "<!-- codex-orchestrator:end -->\nOrphan end.\n",
+            ("<!-- codex-orchestrator:begin -->\n<!-- codex-orchestrator:end -->\n" * 2),
+        ):
+            with self.subTest(original=original):
+                path = self.target / "AGENTS.md"
+                path.write_text(original, encoding="utf-8")
+                result = self.run_setup(["1", "y", "y", "y"])
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(path.read_text(encoding="utf-8"), original)
+                self.assertFalse((self.target / ".codex").exists())
+
+    def test_global_customized_legacy_rules_abort_before_config_changes(self):
+        codex_home = Path(self.temp.name) / "home/.codex"
+        codex_home.mkdir(parents=True)
+        original = 'model = "custom-model"\n'
+        (codex_home / "config.toml").write_text(original, encoding="utf-8")
+        (codex_home / "AGENTS.md").write_text(LEGACY_RULES.replace("high reasoning", "medium reasoning"), encoding="utf-8")
+        result, _, _ = self.run_global(["1", ""])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((codex_home / "config.toml").read_text(encoding="utf-8"), original)
+        self.assertFalse((codex_home / "agents").exists())
+
+    def test_global_missing_root_values_are_not_confused_with_nested_values(self):
+        original = ('[profiles.custom]\nmodel = "keep-model"\nmodel_reasoning_effort = "low"\n'
+                    'sandbox_mode = "read-only"\napproval_policy = "never"\n'
+                    '[agents]\nenabled = false\nmax_concurrent_threads_per_session = 8\n'
+                    'default_subagent_model = "old"\ndefault_subagent_reasoning_effort = "low"\n'
+                    '[mcp_servers.demo]\ncommand = "keep-command"\n')
+        result, _, codex_home = self.run_global(["3", ""], original)
+        self.assert_success(result)
+        merged = tomllib.loads((codex_home / "config.toml").read_text(encoding="utf-8"))
+        self.assertEqual(merged.get("model"), "gpt-6-sol")
+        self.assertEqual(merged.get("model_reasoning_effort"), "high")
+        self.assertEqual(merged.get("sandbox_mode"), "workspace-write")
+        self.assertEqual(merged["profiles"]["custom"]["model"], "keep-model")
+        self.assertEqual(merged["profiles"]["custom"]["sandbox_mode"], "read-only")
+        self.assertEqual(merged["mcp_servers"]["demo"]["command"], "keep-command")
+        self.assertEqual(merged["agents"]["max_concurrent_threads_per_session"], 2)
+        self.assertEqual(merged["agents"]["default_subagent_model"], "gpt-6-luna")
 
     def test_can_skip_every_component(self):
         result = self.run_setup(["1", "n", "n", "n"])

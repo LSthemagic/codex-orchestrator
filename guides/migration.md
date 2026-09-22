@@ -1,57 +1,72 @@
 # Migrating an Existing Installation
 
-The installer intentionally refuses a target containing
-`.agents/skills/astra-orchestrator` or an `astra-orchestrator` reference in
-`AGENTS.md`. This avoids mixing old and new orchestration policies and occurs
-before any installation writes. It does not delete or rewrite legacy content.
+Close the affected Codex session and back up config, named roles, skills and
+instructions outside skill-discovery directories. Preserve unrelated user
+changes. A repository `git pull --ff-only` does not update installed files;
+rerun `setup.ps1` or `setup.sh` afterward.
 
-## Back up and review
+## GPT-5.6 Sol preset to GPT-6
 
-Close the affected Codex session. Back up the target's `.codex`, `.agents` and
-`AGENTS.md` somewhere outside skill-discovery directories. Also review
-`~/.codex/config.toml`, `~/.codex/agents/`, `~/.agents/skills/` and any global
-instructions if you previously installed upstream globally. Project setup does
-not scan, migrate or change those global locations.
+Choose the same scope as the existing installation: Global (default option 1)
+or Project (option 2), then the desired four- or two-child profile.
 
-Move the old `astra-orchestrator` skill to the backup location. Merely renaming
-its directory under `.agents/skills/` is not sufficient: Codex may still discover
-its `SKILL.md`. Edit only the old orchestration instructions in `AGENTS.md`;
-remove or replace the legacy skill reference while preserving project rules.
-Review any extra instructions that pin old root, execution or reviewer models.
-Do not automatically delete a whole instruction file or unrelated skills.
+The installer replaces the exact previous Sol preset instruction block with
+a managed block between `<!-- codex-orchestrator:begin -->` and
+`<!-- codex-orchestrator:end -->`. Surrounding custom rules are retained.
+An existing managed block is updated in place. Before changing instructions,
+the original bytes are saved as `AGENTS.md.bak`; an unchanged reinstall does
+not append a second policy or overwrite that backup. Line endings may normalize.
 
-## Install or merge
+A customized old block or malformed/duplicate markers is rejected before
+target writes. Manually reconcile only the old orchestration instructions,
+preserving your rules, then rerun setup. Do not remove a whole custom file.
 
-Run `setup.ps1` or `setup.sh` and choose the desired profile. The installer
-asks separately before replacing existing component files. An approved
-`config.toml` replacement replaces the whole file; unrelated keys in that file
-are not merged automatically. When you have custom MCP servers, providers,
-permissions or other settings, decline `.codex` replacement and manually merge:
+Global mode merges owned root/agent settings and backs up existing config as
+`config.toml.bak`. Unrelated simple settings/MCP tables remain. This merge is
+line-oriented: manually handle complex multiline/quoted-key TOML. Matching
+named-role and skill files are replaced, so keep your full backup.
 
-- root model `gpt-5.6-sol`, reasoning `high`;
-- `[agents]` enabled, desired child limit, default `gpt-5.6-luna` / `max`;
-- all five named role files, each with Luna / max and its intended sandbox.
+Project mode asks separately before replacing existing components. Approved
+project `config.toml` replacement replaces the entire file; it is not a
+semantic TOML merge. For customized project config, decline that component
+and merge manually:
 
-Copy the new `sol-orchestrator` skill and install or append its project
-instructions. Review existing `sol-orchestrator` instructions too: a customized
-older block should be reconciled manually rather than accumulating contradictory
-versions. Preserve your backups until the new configuration is verified.
+- root `gpt-6-sol` / `high`, existing approval and sandbox policy reviewed;
+- enabled root agents, desired child ceiling, default `gpt-6-luna` / `max`;
+- all nine role files from the selected profile, not just the default model;
+- new skill and managed instructions, without leaving an old policy active.
 
-## Verify
+The [matrix](../README.md#model-matrix) defines explicit role overrides.
+`implementer` is the preferred name; `worker` remains compatible.
 
-Restart Codex in the trusted target project. Confirm Sol/high for the root,
-then run a bounded delegated task and inspect actual child traces for Luna/max.
-Confirm a separate reviewer context and the selected concurrent-child ceiling.
-Do not assume configuration text proves a model call succeeded.
+## Migrating the old upstream Astra skill
 
-If a model, effort or configuration key is rejected, check your Codex version,
-account availability and official documentation. Report the exact error; do not
-silently switch models or remove safeguards. The repository tests validate files
-and installers, not account-specific access to live models.
+A legacy `astra-orchestrator` skill or instruction reference blocks setup
+before writes. Move that skill outside `.agents/skills/`: simply renaming a
+directory there can leave its `SKILL.md` discoverable. Reconcile only its
+old instructions. Do not load both orchestration policies together.
 
-## Roll back
+The new `escalation` role is a bounded Astra consultation, not the old
+`astra-orchestrator` skill, and does not require removing valid custom agents.
 
-Close Codex and restore the backed-up configuration and instructions together.
-Move the newly installed skill outside discovery paths before restoring the old
-one. Restore only the files affected by this installation, not unrelated work.
-Restart Codex and verify the restored configuration.
+## Scope and overrides
+
+Global config, agents and instructions use `CODEX_HOME` or `~/.codex`;
+global skills use `$HOME/.agents/skills`. Project installation never changes
+global locations. Check both scopes if previously installed in both:
+project config and `AGENTS.override.md` can override new global settings.
+
+## Verify and roll back
+
+Restart Codex in the trusted project. Confirm root Sol/high and actual child
+model/effort per role, reviewer context separation and concurrent-child cap.
+Check that no older instruction block remains. Configuration text is not
+evidence of a successful authenticated model call.
+
+Report rejected models, efforts or configuration keys with exact errors.
+Do not silently substitute a model or remove approvals to make a run succeed.
+Tests validate files/installers, not account-specific access or LLM compliance.
+
+For rollback, close Codex and restore affected config, roles, skill and
+instructions together from your backup. Move the newer skill outside discovery
+before restoring an older one. Do not overwrite unrelated changes.

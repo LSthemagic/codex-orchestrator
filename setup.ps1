@@ -10,7 +10,7 @@ $banner = @'
 |          CODEX ORCHESTRATOR           |
 |       Plan with Sol High.             |
 |       Execute with Luna Max.          |
-|       Review with Luna Max.           |
+|       Review with Sol High.           |
 +---------------------------------------+
 '@
 
@@ -66,10 +66,10 @@ function Read-Scope {
 
 function Read-Plan {
     [Console]::WriteLine('Choose Profile to install')
-    [Console]::WriteLine('  1) Pro (4 subagents) - GPT-5.6 Sol (high) orchestrates; GPT-5.6 Luna (max) executes and reviews')
-    [Console]::WriteLine('  2) Plus (compatibility alias, 4 subagents) - GPT-5.6 Sol (high) orchestrates; GPT-5.6 Luna (max) executes and reviews')
-    [Console]::WriteLine('  3) Pro (max 2 subagents) - GPT-5.6 Sol (high) orchestrates; GPT-5.6 Luna (max) executes and reviews')
-    [Console]::WriteLine('  4) Plus (compatibility alias, max 2 subagents) - GPT-5.6 Sol (high) orchestrates; GPT-5.6 Luna (max) executes and reviews')
+    [Console]::WriteLine('  1) Pro (4 subagents) - GPT-6 Sol (high) orchestrates; GPT-6 Luna (max) implements; Sol (high) reviews')
+    [Console]::WriteLine('  2) Plus (compatibility alias, 4 subagents) - GPT-6 Sol (high) orchestrates; GPT-6 Luna (max) implements; Sol (high) reviews')
+    [Console]::WriteLine('  3) Pro (max 2 subagents) - GPT-6 Sol (high) orchestrates; GPT-6 Luna (max) implements; Sol (high) reviews')
+    [Console]::WriteLine('  4) Plus (compatibility alias, max 2 subagents) - GPT-6 Sol (high) orchestrates; GPT-6 Luna (max) implements; Sol (high) reviews')
 
     while ($true) {
         [Console]::Write('Select plan [1-4] (default 1): ')
@@ -225,6 +225,84 @@ function Show-OverwriteWarning {
     }
 }
 
+function Get-MergedInstructions {
+    param([Parameter(Mandatory)][string]$Destination)
+    $existing = [IO.File]::ReadAllText($Destination).Replace("`r`n", "`n")
+    $replacement = [IO.File]::ReadAllText((Join-Path $scriptDir 'AGENTS.md')).Replace("`r`n", "`n")
+    $legacy = [IO.File]::ReadAllText((Join-Path $scriptDir 'scripts/legacy-sol-AGENTS.md')).Replace("`r`n", "`n").TrimEnd("`n")
+    $beginMarker = '<!-- codex-orchestrator:begin -->'
+    $endMarker = '<!-- codex-orchestrator:end -->'
+    $begins = [regex]::Matches($existing, '(?m)^' + [regex]::Escape($beginMarker) + '$')
+    $ends = [regex]::Matches($existing, '(?m)^' + [regex]::Escape($endMarker) + '$')
+    if ($begins.Count -ne $ends.Count -or $begins.Count -gt 1 -or
+        ($begins.Count -eq 1 -and $begins[0].Index -ge $ends[0].Index)) {
+        throw 'Invalid managed instruction markers. Follow guides/migration.md; no files changed.'
+    }
+    $pattern = '(?ms)^' + [regex]::Escape($beginMarker) + '\n.*?^' +
+        [regex]::Escape($endMarker) + '(?:\n|$)|^' + [regex]::Escape($legacy) + '(?:\n|$)'
+    $output = [Text.StringBuilder]::new()
+    $residual = [Text.StringBuilder]::new()
+    $cursor = 0
+    $written = $false
+    foreach ($match in [regex]::Matches($existing, $pattern)) {
+        $before = $existing.Substring($cursor, $match.Index - $cursor)
+        $null = $output.Append($before)
+        $null = $residual.Append($before)
+        if (-not $written) { $null = $output.Append($replacement); $written = $true }
+        $cursor = $match.Index + $match.Length
+    }
+    $tail = $existing.Substring($cursor)
+    $null = $output.Append($tail)
+    $null = $residual.Append($tail)
+    if ($residual.ToString().Contains('sol-orchestrator') -and $residual.ToString() -match '(?i)gpt-5[.]6') {
+        throw 'Customized legacy instructions require manual reconciliation. Follow guides/migration.md; no files changed.'
+    }
+    if (-not $written) {
+        if ($output.Length -gt 0) {
+            if (-not $output.ToString().EndsWith("`n")) { $null = $output.Append("`n") }
+            $null = $output.Append("`n")
+        }
+        $null = $output.Append($replacement)
+    }
+    $result = $output.ToString()
+    if (-not $result.EndsWith("`n")) { $result += "`n" }
+    return $result
+}
+
+function Test-Instructions {
+    param([Parameter(Mandatory)][string]$Destination)
+    foreach ($path in @($Destination, "$Destination.bak")) {
+        $item = Get-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+        if ($null -ne $item -and ($item.PSIsContainer -or
+            ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
+            throw "Instructions and backup must be regular files: $path"
+        }
+    }
+    if (Test-Path -LiteralPath $Destination -PathType Leaf) {
+        $null = Get-MergedInstructions -Destination $Destination
+    }
+}
+
+function Install-Instructions {
+    param([Parameter(Mandatory)][string]$Destination)
+    Test-Instructions -Destination $Destination
+    if (-not (Test-Path -LiteralPath $Destination -PathType Leaf)) {
+        Copy-Item -LiteralPath (Join-Path $scriptDir 'AGENTS.md') -Destination $Destination
+        [Console]::WriteLine("Installed instructions: $Destination")
+        return $true
+    }
+    $existing = [IO.File]::ReadAllText($Destination)
+    $merged = Get-MergedInstructions -Destination $Destination
+    if ([string]::Equals($existing, $merged, [StringComparison]::Ordinal)) {
+        [Console]::WriteLine("Skipped instructions: already current in $Destination.")
+        return $false
+    }
+    Copy-Item -LiteralPath $Destination -Destination "$Destination.bak" -Force
+    [IO.File]::WriteAllText($Destination, $merged, [Text.UTF8Encoding]::new($false))
+    [Console]::WriteLine("Updated managed instructions; other rules preserved. Backup: $Destination.bak")
+    return $true
+}
+
 function Install-Component {
     param(
         [Parameter(Mandatory)]
@@ -270,24 +348,7 @@ function Install-Component {
         }
 
         if ($Name -eq 'AGENTS.md') {
-            $instructions = [IO.File]::ReadAllText($sourcePath)
-            $existing = [IO.File]::ReadAllText($destinationPath)
-            $normalizedInstructions = $instructions.Replace("`r`n", "`n").TrimEnd("`n")
-            if ($existing.Replace("`r`n", "`n").Contains($normalizedInstructions)) {
-                [Console]::WriteLine("Skipped ${Name}: instructions already present.")
-                return $false
-            }
-            $reader = [IO.StreamReader]::new($destinationPath, [Text.Encoding]::UTF8, $true)
-            try {
-                $null = $reader.ReadToEnd()
-                $encoding = $reader.CurrentEncoding
-            }
-            finally {
-                $reader.Dispose()
-            }
-            [IO.File]::AppendAllText($destinationPath, "`n`n" + $instructions, $encoding)
-            [Console]::WriteLine("Appended instructions to ${Name}. Existing contents preserved.")
-            return $true
+            return (Install-Instructions -Destination $destinationPath)
         }
 
         Show-OverwriteWarning -Source $sourceItem -Destination $destinationPath -Name $Name
@@ -328,7 +389,7 @@ function Merge-GlobalConfig {
     $backup = "$DestinationConfig.bak"
     Copy-Item -LiteralPath $DestinationConfig -Destination $backup -Force
     $rootValues = [ordered]@{
-        model = 'model = "gpt-5.6-sol"'
+        model = 'model = "gpt-6-sol"'
         model_reasoning_effort = 'model_reasoning_effort = "high"'
         approval_policy = 'approval_policy = "on-request"'
         sandbox_mode = 'sandbox_mode = "workspace-write"'
@@ -336,7 +397,7 @@ function Merge-GlobalConfig {
     $agentValues = [ordered]@{
         enabled = 'enabled = true'
         max_concurrent_threads_per_session = if ($source -match 'max_concurrent_threads_per_session\s*=\s*2') { 'max_concurrent_threads_per_session = 2' } else { 'max_concurrent_threads_per_session = 4' }
-        default_subagent_model = 'default_subagent_model = "gpt-5.6-luna"'
+        default_subagent_model = 'default_subagent_model = "gpt-6-luna"'
         default_subagent_reasoning_effort = 'default_subagent_reasoning_effort = "max"'
     }
     $lines = @($existing -split "\r?\n")
@@ -346,9 +407,9 @@ function Merge-GlobalConfig {
     $agentsSeen = @{}
     $agentsFound = $false
     foreach ($line in $lines) {
-        if ($line -match '^\s*\[([^]]+)\]\s*(?:#.*)?$') {
+        if ($line -match '^\s*\[') {
             if ($section -eq 'agents') { foreach ($key in $agentValues.Keys) { if (-not $agentsSeen.ContainsKey($key)) { $output.Add($agentValues[$key]) } } }
-            $section = $Matches[1]
+            $section = if ($line -match '^\s*\[([^]]+)\]\s*(?:#.*)?$') { $Matches[1].Trim() } else { '__other__' }
             if ($section -eq 'agents') { $agentsFound = $true }
             $output.Add($line); continue
         }
@@ -358,6 +419,7 @@ function Merge-GlobalConfig {
         }
         if ($section -eq 'agents' -and $line -match '^\s*([A-Za-z0-9_-]+)\s*=') {
             $key = $Matches[1]
+            if ($key -eq 'max_threads') { continue }
             if ($agentValues.Contains($key)) { $output.Add($agentValues[$key]); $agentsSeen[$key] = $true; continue }
         }
         $output.Add($line)
@@ -384,19 +446,14 @@ function Install-Global {
     $globalInstructions = Join-Path $codexHome 'AGENTS.md'
     $hasLegacyInstructions = (Test-Path -LiteralPath $globalInstructions -PathType Leaf) -and ([IO.File]::ReadAllText($globalInstructions).Contains('astra-orchestrator'))
     if ((Test-Path -LiteralPath $legacySkill) -or $hasLegacyInstructions) { throw 'Legacy global orchestration found. Follow guides/migration.md before installing; no files changed.' }
+    Test-Instructions -Destination $globalInstructions
     New-Item -ItemType Directory -Path $codexHome -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $codexHome 'agents') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $agentsHome 'skills') -Force | Out-Null
     Merge-GlobalConfig -SourceConfig (Join-Path $ProfileDirectory 'codex/config.toml') -DestinationConfig (Join-Path $codexHome 'config.toml')
     Copy-DirectoryContents -Source (Join-Path $ProfileDirectory 'codex/agents') -Destination (Join-Path $codexHome 'agents')
     Copy-DirectoryContents -Source (Join-Path $ProfileDirectory 'agents/skills') -Destination (Join-Path $agentsHome 'skills')
-    $instructionsSource = Join-Path $scriptDir 'AGENTS.md'
-    if (Test-Path -LiteralPath $globalInstructions -PathType Leaf) {
-        $instructions = [IO.File]::ReadAllText($instructionsSource)
-        $existing = [IO.File]::ReadAllText($globalInstructions)
-        $normalized = $instructions.Replace("`r`n", "`n").TrimEnd("`n")
-        if (-not $existing.Replace("`r`n", "`n").Contains($normalized)) { [IO.File]::AppendAllText($globalInstructions, "`n`n" + $instructions, [Text.UTF8Encoding]::new($false)) }
-    } else { Copy-Item -LiteralPath $instructionsSource -Destination $globalInstructions }
+    $null = Install-Instructions -Destination $globalInstructions
     if (Test-Path -LiteralPath (Join-Path $codexHome 'AGENTS.override.md') -PathType Leaf) { [Console]::WriteLine('WARNING: AGENTS.override.md exists in CODEX_HOME, so Codex will prefer it over the installed global AGENTS.md.') }
     [Console]::WriteLine("Global setup complete in $codexHome and $agentsHome.")
     [Console]::WriteLine('Restart Codex and invoke $sol-orchestrator. Project-level config can still override global settings.')
@@ -407,7 +464,7 @@ try {
     $plan = Read-Plan
     $profileDirectory = Join-Path $scriptDir "profiles/$plan"
     if ($scope -eq 'global') {
-        if (Read-Confirmation -Prompt 'Install Sol High + Luna Max globally for this user?' -DefaultYes $true) { Install-Global -ProfileDirectory $profileDirectory }
+        if (Read-Confirmation -Prompt 'Install GPT-6 role routing globally for this user?' -DefaultYes $true) { Install-Global -ProfileDirectory $profileDirectory }
         else { [Console]::WriteLine('Global installation skipped.') }
         exit 0
     }
@@ -423,6 +480,7 @@ try {
     $targetInstructions = Join-Path $targetDirectory 'AGENTS.md'
     $hasLegacyInstructions = (Test-Path -LiteralPath $targetInstructions -PathType Leaf) -and ([IO.File]::ReadAllText($targetInstructions).Contains('astra-orchestrator'))
     if ((Test-Path -LiteralPath $legacySkill) -or $hasLegacyInstructions) { throw 'Legacy orchestration found. Follow guides/migration.md before installing; no files changed.' }
+    Test-Instructions -Destination $targetInstructions
     $installed = 0
     foreach ($component in '.codex', '.agents', 'AGENTS.md') {
         if (Read-Confirmation -Prompt ("Install {0}?" -f $component) -DefaultYes $true) {

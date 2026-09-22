@@ -1,5 +1,5 @@
-name = "worker"
-description = "Compatibility alias for implementer: bounded coding with GPT-6 Luna Max. Use implementer for new delegations."
+name = "implementer"
+description = "Implementation subagent for bounded coding tasks. Use after the relevant code path and acceptance criteria are understood."
 
 model = "gpt-6-luna"
 model_reasoning_effort = "max"

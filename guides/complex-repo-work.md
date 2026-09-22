@@ -1,19 +1,27 @@
 # Complex Repository Work
 
-The standard [Sol/Luna profile](full-orchestration.md) already uses Sol at
-`high` reasoning. No model override is needed for cross-component debugging,
-architecture-sensitive fixes or multi-file features.
+Use the standard [GPT-6 matrix](../README.md#model-matrix), not Sol for every task.
+The Sol/high root establishes acceptance criteria, dependencies and ownership.
+Luna/medium explores bounded paths; Luna/max researches current primary sources
+and implements bounded changes. Keep shared interfaces and dependent writes
+sequential, even when independent exploration can run concurrently.
 
-Ask the root to map dependencies and establish acceptance criteria first.
-Delegate independent exploration to Luna, then assign implementation with
-explicit file ownership. Keep dependent changes sequential. Use a fresh Luna
-reviewer context for correctness, security and regression risks; Sol integrates
-findings and owns final verification.
+Route causal cross-component failures, concurrency and performance investigations
+to the Sol/high debugger. Structural contracts, migrations and high-impact
+tradeoffs go to the read-only Sol/xhigh architect. These roles can be selected
+up front when risk warrants; Luna does not have to fail first.
 
-Start with the existing four-child ceiling or select the two-child profile.
-Do not add agents merely because a slot is available. Avoid simultaneous
-writers to shared schemas, API contracts or configuration files. Report
-architectural blockers to the root instead of automatically changing models.
+A Luna implementation receives at most one corrective retry with useful feedback
+before Sol diagnosis. Review the resulting material diff in a fresh Sol/high
+reviewer context, test with Luna/high, and verify the integrated state at root.
+Architecture, debugger and reviewer are distinct responsibilities, not a mandate
+to spawn every role.
 
-Measure actual results with [token-usage.md](token-usage.md). More concurrency
-or reasoning is not a guarantee of higher quality, lower cost or faster delivery.
+Only a justified unresolved question after relevant Sol analysis, or explicit
+user request, should reach the Astra/high read-only escalation role. No more
+than one consultation per bounded item under the default skill policy. Do not
+hide operational failures by escalating models.
+
+Keep the four-child ceiling or select the two-child profile. No overlapping
+writers or recursive swarms. Measure actual results with [token usage](token-usage.md);
+more reasoning or agents does not guarantee lower total cost or better output.
