@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-09-30",
+  "sources": [
+    "https://developers.openai.com/api/docs/changelog",
+    "https://developers.openai.com/api/docs/models"
+  ],
+  "models": {
+    "gpt-6-luna": {
+      "tier": "luna",
+      "efforts": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "status": "active"
+    },
+    "gpt-6-sol": {
+      "tier": "sol",
+      "efforts": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "status": "active"
+    },
+    "gpt-6.1-sol": {
+      "tier": "sol",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "status": "active"
+    },
+    "gpt-6-astra": {
+      "tier": "astra",
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "status": "active"
+    }
+  },
+  "routing": {
+    "root": [
+      "gpt-6.1-sol",
+      "high"
+    ],
+    "explorer": [
+      "gpt-6-luna",
+      "medium"
+    ],
+    "researcher": [
+      "gpt-6-luna",
+      "max"
+    ],
+    "implementer": [
+      "gpt-6-luna",
+      "max"
+    ],
+    "worker": [
+      "gpt-6-luna",
+      "max"
+    ],
+    "tester": [
+      "gpt-6-luna",
+      "high"
+    ],
+    "debugger": [
+      "gpt-6.1-sol",
+      "high"
+    ],
+    "reviewer": [
+      "gpt-6.1-sol",
+      "high"
+    ],
+    "architect": [
+      "gpt-6.1-sol",
+      "xhigh"
+    ],
+    "escalation": [
+      "gpt-6-astra",
+      "high"
+    ]
+  }
+}
