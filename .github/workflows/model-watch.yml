@@ -1,0 +1,38 @@
+name: Model watch
+on:
+  schedule:
+    - cron: '17 10 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: model-watch
+  cancel-in-progress: true
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Check official OpenAI model docs
+        run: python scripts/model_watch.py
+      - name: Validate registry and dry-run benchmark
+        run: |
+          python -m unittest discover -s tests -v
+          python scripts/benchmark_models.py
+      - name: Open review PR when report changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- model-watch/report.md; then exit 0; fi
+          branch="automation/model-watch-$(date -u +%Y%m%d)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add model-watch/report.md
+          git commit -m "chore: refresh model watch report"
+          git push --force-with-lease origin "$branch"
+          gh pr create --base main --head "$branch" --title "chore: review OpenAI model changes" --body "Automated model discovery from official OpenAI docs. Review the candidate routing changes, verify effort compatibility, and run the live benchmark before changing the active matrix. This workflow never auto-merges."
