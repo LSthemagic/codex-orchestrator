@@ -1,11 +1,11 @@
-# Codex GPT-6: Sol High orchestrator + task-specific model/effort routing.
+# Codex GPT-6: 6.1 Sol High orchestrator + task-specific model/effort routing.
 # Adapted from donvito/codex-astra-luna-orchestrator by LSthemagic.
 # Install at <project>/.codex/config.toml, or merge into ~/.codex/config.toml.
 # Named roles in agents/*.toml override the Luna Max fallback below.
 # Astra is available only as the exceptional, read-only escalation role.
 # Profile names pro/plus are compatibility aliases, not subscription checks.
 
-model = "gpt-6-sol"
+model = "gpt-6.1-sol"
 model_reasoning_effort = "high"
 
 approval_policy = "on-request"
