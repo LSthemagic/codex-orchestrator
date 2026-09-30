@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "tasks": [
+    {
+      "id": "explore",
+      "role": "explorer",
+      "prompt": "Map the relevant execution path for a bounded bug without editing files."
+    },
+    {
+      "id": "implement",
+      "role": "implementer",
+      "prompt": "Implement a small bounded change and run focused validation."
+    },
+    {
+      "id": "debug",
+      "role": "debugger",
+      "prompt": "Reproduce a cross-component failure and identify evidence-backed root cause."
+    },
+    {
+      "id": "review",
+      "role": "reviewer",
+      "prompt": "Review a material diff for correctness, security, regression and missing tests."
+    },
+    {
+      "id": "architecture",
+      "role": "architect",
+      "prompt": "Evaluate a high-impact contract change and return incremental options and rollback criteria."
+    }
+  ],
+  "metrics": [
+    "exit_code",
+    "elapsed_seconds",
+    "output_bytes"
+  ],
+  "note": "Representative harness. Quality remains human-reviewed; this file does not claim an automatic quality score."
+}
