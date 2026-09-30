@@ -12,9 +12,9 @@ ROLES = {
     "implementer": ("gpt-6-luna", "max", "workspace-write"),
     "worker": ("gpt-6-luna", "max", "workspace-write"),
     "tester": ("gpt-6-luna", "high", "workspace-write"),
-    "debugger": ("gpt-6-sol", "high", "workspace-write"),
-    "reviewer": ("gpt-6-sol", "high", "read-only"),
-    "architect": ("gpt-6-sol", "xhigh", "read-only"),
+    "debugger": ("gpt-6.1-sol", "high", "workspace-write"),
+    "reviewer": ("gpt-6.1-sol", "high", "read-only"),
+    "architect": ("gpt-6.1-sol", "xhigh", "read-only"),
     "escalation": ("gpt-6-astra", "high", "read-only"),
 }
 
@@ -29,7 +29,7 @@ class ProfileTests(unittest.TestCase):
             with self.subTest(profile=profile):
                 config = read_toml(ROOT / "profiles" / profile / "codex/config.toml")
                 self.assertEqual((config["model"], config["model_reasoning_effort"]),
-                                 ("gpt-6-sol", "high"))
+                                 ("gpt-6.1-sol", "high"))
 
     def test_defaults_limits_and_approvals(self):
         for profile, limit in PROFILES.items():
@@ -126,7 +126,7 @@ class ProfileTests(unittest.TestCase):
                     config = tomllib.loads(match.group(1))
                     if "model" in config:
                         self.assertEqual((config["model"], config["model_reasoning_effort"]),
-                                         ("gpt-6-sol", "high"))
+                                         ("gpt-6.1-sol", "high"))
                 for link in re.findall(r"\]\(([^)#]+)(?:#[^)]*)?\)", content):
                     if "://" not in link and link != "LICENSE":
                         self.assertTrue((path.parent / link).exists(), (path.name, link))
