@@ -389,7 +389,7 @@ function Merge-GlobalConfig {
     $backup = "$DestinationConfig.bak"
     Copy-Item -LiteralPath $DestinationConfig -Destination $backup -Force
     $rootValues = [ordered]@{
-        model = 'model = "gpt-6-sol"'
+        model = 'model = "gpt-6.1-sol"'
         model_reasoning_effort = 'model_reasoning_effort = "high"'
         approval_policy = 'approval_policy = "on-request"'
         sandbox_mode = 'sandbox_mode = "workspace-write"'

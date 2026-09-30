@@ -266,7 +266,7 @@ merge_global_config() {
         BEGIN { section="" }
         function emit_root() {
             if (root_done) return
-            if (!r_model) print "model = \"gpt-6-sol\""
+            if (!r_model) print "model = \"gpt-6.1-sol\""
             if (!r_effort) print "model_reasoning_effort = \"high\""
             if (!r_approval) print "approval_policy = \"on-request\""
             if (!r_sandbox) print "sandbox_mode = \"workspace-write\""
@@ -286,7 +286,7 @@ merge_global_config() {
             if (section=="agents") agents_found=1
             print; next
         }
-        section=="" && /^[[:space:]]*model[[:space:]]*=/ { print "model = \"gpt-6-sol\""; r_model=1; next }
+        section=="" && /^[[:space:]]*model[[:space:]]*=/ { print "model = \"gpt-6.1-sol\""; r_model=1; next }
         section=="" && /^[[:space:]]*model_reasoning_effort[[:space:]]*=/ { print "model_reasoning_effort = \"high\""; r_effort=1; next }
         section=="" && /^[[:space:]]*approval_policy[[:space:]]*=/ { print "approval_policy = \"on-request\""; r_approval=1; next }
         section=="" && /^[[:space:]]*sandbox_mode[[:space:]]*=/ { print "sandbox_mode = \"workspace-write\""; r_sandbox=1; next }
