@@ -57,7 +57,7 @@ class InstallerCases:
         result, home, codex_home = self.run_global(["1", ""])
         self.assert_success(result)
         config = tomllib.loads((codex_home / "config.toml").read_text(encoding="utf-8"))
-        self.assertEqual(config["model"], "gpt-6-sol")
+        self.assertEqual(config["model"], "gpt-6.1-sol")
         self.assertEqual(config["model_reasoning_effort"], "high")
         self.assertEqual(config["agents"]["default_subagent_model"], "gpt-6-luna")
         self.assertEqual(config["agents"]["default_subagent_reasoning_effort"], "max")
@@ -71,7 +71,7 @@ class InstallerCases:
         self.assert_success(result)
         merged_text = (codex_home / "config.toml").read_text(encoding="utf-8")
         merged = tomllib.loads(merged_text)
-        self.assertEqual(merged["model"], "gpt-6-sol")
+        self.assertEqual(merged["model"], "gpt-6.1-sol")
         self.assertEqual(merged["model_reasoning_effort"], "high")
         self.assertEqual(merged["custom_setting"], "keep")
         self.assertEqual(merged["mcp_servers"]["demo"]["command"], "demo")
@@ -126,7 +126,7 @@ class InstallerCases:
         result = self.run_setup(["1", "y", "y", "n", "n"])
         self.assert_success(result)
         self.assertEqual(extra.read_text(encoding="utf-8"), "keep this")
-        self.assertEqual(tomllib.loads(config.read_text(encoding="utf-8"))["model"], "gpt-6-sol")
+        self.assertEqual(tomllib.loads(config.read_text(encoding="utf-8"))["model"], "gpt-6.1-sol")
 
     def test_agents_append_is_idempotent(self):
         path = self.target / "AGENTS.md"
@@ -162,8 +162,8 @@ class InstallerCases:
         for role, model, effort in (
             ("explorer", "gpt-6-luna", "medium"), ("researcher", "gpt-6-luna", "max"),
             ("implementer", "gpt-6-luna", "max"), ("worker", "gpt-6-luna", "max"),
-            ("tester", "gpt-6-luna", "high"), ("debugger", "gpt-6-sol", "high"),
-            ("reviewer", "gpt-6-sol", "high"), ("architect", "gpt-6-sol", "xhigh"),
+            ("tester", "gpt-6-luna", "high"), ("debugger", "gpt-6.1-sol", "high"),
+            ("reviewer", "gpt-6.1-sol", "high"), ("architect", "gpt-6.1-sol", "xhigh"),
             ("escalation", "gpt-6-astra", "high"),
         ):
             with self.subTest(role=role):
@@ -239,7 +239,7 @@ class InstallerCases:
         result, _, codex_home = self.run_global(["3", ""], original)
         self.assert_success(result)
         merged = tomllib.loads((codex_home / "config.toml").read_text(encoding="utf-8"))
-        self.assertEqual(merged.get("model"), "gpt-6-sol")
+        self.assertEqual(merged.get("model"), "gpt-6.1-sol")
         self.assertEqual(merged.get("model_reasoning_effort"), "high")
         self.assertEqual(merged.get("sandbox_mode"), "workspace-write")
         self.assertEqual(merged["profiles"]["custom"]["model"], "keep-model")
