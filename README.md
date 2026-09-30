@@ -1,6 +1,6 @@
 # Codex Orchestrator: GPT-6 role routing
 
-A global-or-project Codex setup: **Sol High coordinates and reviews; Luna Max
+A global-or-project Codex setup: **6.1 Sol High coordinates and reviews; Luna Max
 implements and researches**. Lighter roles use less reasoning; architecture and
 exceptional escalation have their own explicitly configured roles.
 
@@ -12,15 +12,15 @@ the [Apache License 2.0](LICENSE).
 
 | Role | Model | Effort | Sandbox |
 |---|---|---|---|
-| root / orchestrator | `gpt-6-sol` | `high` | workspace-write |
+| root / orchestrator | `gpt-6.1-sol` | `high` | workspace-write |
 | explorer | `gpt-6-luna` | `medium` | read-only |
 | researcher | `gpt-6-luna` | `max` | read-only |
 | implementer | `gpt-6-luna` | `max` | workspace-write |
 | worker (compatibility alias) | `gpt-6-luna` | `max` | workspace-write |
 | tester | `gpt-6-luna` | `high` | workspace-write |
-| debugger | `gpt-6-sol` | `high` | workspace-write |
-| reviewer | `gpt-6-sol` | `high` | read-only |
-| architect | `gpt-6-sol` | `xhigh` | read-only |
+| debugger | `gpt-6.1-sol` | `high` | workspace-write |
+| reviewer | `gpt-6.1-sol` | `high` | read-only |
+| architect | `gpt-6.1-sol` | `xhigh` | read-only |
 | escalation (exceptional consultation) | `gpt-6-astra` | `high` | read-only |
 
 Every named role explicitly pins its model, effort and sandbox. `worker` retains
@@ -35,13 +35,13 @@ independent work or validation. Prefer Luna Max for normal implementation.
 After an actionable test/review failure, allow **one corrective retry** (two
 total implementation attempts per bounded item); do not repeat without new
 evidence. Then route causal investigation to `debugger` or structural decisions
-to `architect`. High-risk work can use the appropriate Sol role immediately.
+to `architect`. High-risk work can use the appropriate 6.1 Sol role immediately.
 
-The Sol reviewer uses a **separate context** from the implementer and reports
+The 6.1 Sol reviewer uses a **separate context** from the implementer and reports
 findings instead of editing. A different model/context is not a correctness
 guarantee: the root verifies evidence and tests on the integrated result.
 
-Astra is not part of the normal pipeline. After relevant Sol analysis remains
+Astra is not part of the normal pipeline. After relevant 6.1 Sol analysis remains
 blocked, or an explicit user request, the root may request **at most one
 justified Astra consultation per bounded item**, with evidence and a precise
 decision question. Authentication, model availability, permissions and quota
@@ -70,7 +70,7 @@ same files or spawn all roles just because they exist.
 ## Requirements
 
 Use an updated Codex client/account exposing these models, reasoning efforts
-and custom subagents. Consult the official [model announcement](https://openai.com/index/introducing-gpt-6-sol-and-luna/),
+and custom subagents. Consult the official [model announcement](https://openai.com/index/introducing-gpt-6.1-sol-and-luna/),
 [configuration reference](https://developers.openai.com/codex/config-reference/)
 and [subagents documentation](https://developers.openai.com/codex/subagents/).
 Availability depends on version, account and rollout. The installer does not
@@ -156,7 +156,7 @@ about a global override file.
 The default four-child root profile:
 
 ```toml
-model = "gpt-6-sol"
+model = "gpt-6.1-sol"
 model_reasoning_effort = "high"
 
 approval_policy = "on-request"
@@ -183,7 +183,7 @@ session, then invoke:
 $sol-orchestrator
 
 Map the relevant execution path. Use the configured explorer and implementer,
-validate with tester and request a separate Sol reviewer for material changes.
+validate with tester and request a separate 6.1 Sol reviewer for material changes.
 Preserve public contracts and file ownership. Do not commit or push.
 ```
 
@@ -210,6 +210,27 @@ python scripts/token_usage.py --latest
 
 Compare representative tasks, actual token usage, elapsed time and verified
 outcomes. Luna Max's tariff does not make total task cost or latency fixed.
+
+
+## Automatic model watch
+
+The repository now keeps a machine-readable model registry in `model-watch/models.json`.
+The daily `Model watch` workflow checks the official OpenAI API changelog and model catalog,
+detects new GPT Sol/Luna/Astra model IDs, validates the configured reasoning effort for every
+role, and refreshes `model-watch/report.md`. When discovery changes that report, the workflow
+opens a review PR; it never changes the active routing matrix or merges automatically.
+
+Run the same checks locally:
+
+```bash
+python scripts/model_watch.py
+python scripts/benchmark_models.py
+python scripts/benchmark_models.py --live   # intentionally spends authenticated Codex quota
+```
+
+The benchmark manifest in `benchmarks/tasks.json` covers exploration, implementation, debugging,
+review, and architecture. Dry-run mode is the CI default. Live mode requires a working authenticated
+`codex` executable and records execution evidence; model quality remains a human review decision.
 
 ## Validation
 

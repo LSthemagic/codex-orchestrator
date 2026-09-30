@@ -15,15 +15,15 @@ Delegate bounded work, not ownership of the overall objective.
 
 | Role | Model | Reasoning | Sandbox |
 | --- | --- | --- | --- |
-| Root / orchestrator | `gpt-6-sol` | `high` | workspace-write |
+| Root / orchestrator | `gpt-6.1-sol` | `high` | workspace-write |
 | explorer | `gpt-6-luna` | `medium` | read-only |
 | researcher | `gpt-6-luna` | `max` | read-only |
 | implementer | `gpt-6-luna` | `max` | workspace-write |
 | worker | `gpt-6-luna` | `max` | workspace-write |
 | tester | `gpt-6-luna` | `high` | workspace-write |
-| debugger | `gpt-6-sol` | `high` | workspace-write |
-| reviewer | `gpt-6-sol` | `high` | read-only |
-| architect | `gpt-6-sol` | `xhigh` | read-only |
+| debugger | `gpt-6.1-sol` | `high` | workspace-write |
+| reviewer | `gpt-6.1-sol` | `high` | read-only |
+| architect | `gpt-6.1-sol` | `xhigh` | read-only |
 | escalation | `gpt-6-astra` | `high` | read-only |
 
 `worker` is a compatibility alias for `implementer`, not an extra mandatory stage.
@@ -80,9 +80,9 @@ symbols, call path and relevant tests. Do not edit files."
 
 A known difficult cross-service bug may go directly to `debugger`; a critical
 contract question may go directly to `architect`. Do not force a failed Luna
-attempt merely to walk a ladder. Sol analysis can return a bounded fix to Luna.
+attempt merely to walk a ladder. 6.1 Sol analysis can return a bounded fix to Luna.
 
-The Sol reviewer must run in a separate context from the Luna implementer.
+The 6.1 Sol reviewer must run in a separate context from the Luna implementer.
 This reduces self-review coupling; it does not guarantee independence of errors
 or correctness. The root must assess the evidence and run final verification.
 
@@ -125,7 +125,7 @@ inappropriate. A new attempt must not silently expand permissions or scope.
 
 Astra is not a routine fallback and is never an automatic response to one failure.
 Use `escalation` only when the user explicitly requests Astra, or when a
-high-impact issue remains unresolved after the relevant Sol analysis. For a
+high-impact issue remains unresolved after the relevant 6.1 Sol analysis. For a
 structural issue, obtain Sol XHigh `architect` analysis before consulting Astra.
 Record the justification, prior attempts, remaining question and acceptance criteria.
 Allow at most one Astra consultation per bounded work item. If it is unavailable

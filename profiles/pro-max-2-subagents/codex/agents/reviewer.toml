@@ -1,7 +1,7 @@
 name = "reviewer"
 description = "Read-only code reviewer. Use after implementation to find correctness, security, regression, concurrency, data-integrity, and missing-test risks."
 
-model = "gpt-6-sol"
+model = "gpt-6.1-sol"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 

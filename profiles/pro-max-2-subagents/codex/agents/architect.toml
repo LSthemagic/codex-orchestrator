@@ -1,7 +1,7 @@
 name = "architect"
 description = "Read-only architecture specialist for high-impact contracts, shared abstractions, migrations, and cross-service decisions."
 
-model = "gpt-6-sol"
+model = "gpt-6.1-sol"
 model_reasoning_effort = "xhigh"
 sandbox_mode = "read-only"
 
