@@ -211,6 +211,27 @@ python scripts/token_usage.py --latest
 Compare representative tasks, actual token usage, elapsed time and verified
 outcomes. Luna Max's tariff does not make total task cost or latency fixed.
 
+
+## Automatic model watch
+
+The repository now keeps a machine-readable model registry in `model-watch/models.json`.
+The daily `Model watch` workflow checks the official OpenAI API changelog and model catalog,
+detects new GPT Sol/Luna/Astra model IDs, validates the configured reasoning effort for every
+role, and refreshes `model-watch/report.md`. When discovery changes that report, the workflow
+opens a review PR; it never changes the active routing matrix or merges automatically.
+
+Run the same checks locally:
+
+```bash
+python scripts/model_watch.py
+python scripts/benchmark_models.py
+python scripts/benchmark_models.py --live   # intentionally spends authenticated Codex quota
+```
+
+The benchmark manifest in `benchmarks/tasks.json` covers exploration, implementation, debugging,
+review, and architecture. Dry-run mode is the CI default. Live mode requires a working authenticated
+`codex` executable and records execution evidence; model quality remains a human review decision.
+
 ## Validation
 
 ```bash
